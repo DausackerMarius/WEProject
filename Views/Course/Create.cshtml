@@ -1,0 +1,57 @@
+@model WeProject.Models.Course
+
+@{
+    ViewData["Title"] = "Neue Lehrveranstaltung";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0">Neue Lehrveranstaltung anlegen</h3>
+                </div>
+                <div class="card-body bg-light">
+                    <form asp-action="Create">
+                        <div class="mb-3">
+                            <label asp-for="Title" class="form-label fw-bold">Titel der Veranstaltung</label>
+                            <input asp-for="Title" class="form-control" placeholder="z. B. Web Engineering" required />
+                            <span asp-validation-for="Title" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="LecturerName" class="form-label fw-bold">Name des Dozenten</label>
+                            <input asp-for="LecturerName" class="form-control" placeholder="z. B. Prof. Dr. Code" required />
+                            <span asp-validation-for="LecturerName" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Studiengang</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" asp-for="IsMasterCourse" value="false" id="bachelorRadio" checked>
+                                <label class="form-check-label" for="bachelorRadio">
+                                    Bachelor
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" asp-for="IsMasterCourse" value="true" id="masterRadio">
+                                <label class="form-check-label" for="masterRadio">
+                                    Master
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" class="btn btn-outline-secondary">Abbrechen</a>
+                            <button type="submit" class="btn btn-success px-4">Speichern</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

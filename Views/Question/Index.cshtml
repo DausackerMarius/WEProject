@@ -1,0 +1,64 @@
+@model WeProject.Models.Chapter
+
+@{
+    ViewData["Title"] = "Fragen - " + (Model?.Title ?? "Unbekannt");
+}
+
+<div class="container mt-4">
+    <div class="mb-4">
+        <a asp-controller="Chapter" asp-action="Index" asp-route-courseId="@Model?.CourseId" class="btn btn-outline-secondary">
+            &larr; Zurück zur Kapitelübersicht
+        </a>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Prüfungsfragen: @Model?.Title</h2>
+        <div class="d-flex gap-2">
+            <a asp-action="Create" asp-route-chapterId="@Model?.Id" class="btn btn-success fw-bold shadow-sm">Frage manuell anlegen</a>
+            <button class="btn btn-warning fw-bold shadow-sm">Neue Frage generieren</button>
+        </div>
+    </div>
+
+    @if (Model?.Questions != null && Model.Questions.Any())
+    {
+        @foreach (var question in Model.Questions)
+        {
+            <div class="list-group shadow-sm mb-4 border-0">
+                <div class="list-group-item list-group-item-secondary fw-bold fs-5 border-bottom-0">
+                    @question.Text
+                </div>
+                
+                @if (question.AnswerOptions != null)
+                {
+                    @foreach (var option in question.AnswerOptions)
+                    {
+                        <div class="list-group-item @(option.IsCorrect ? "list-group-item-success" : "bg-light")">
+                            @if (option.IsCorrect)
+                            {
+                                <span class="badge bg-success me-2">Korrekt</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary me-2">Falsch</span>
+                            }
+                            @option.Text
+                        </div>
+                    }
+                }
+
+                <div class="list-group-item bg-white text-end border-top-0 pt-3">
+                    <div class="d-flex justify-content-end gap-2">
+                        <a asp-action="Edit" asp-route-id="@question.Id" class="btn btn-sm btn-outline-primary">Bearbeiten</a>
+                        <form asp-action="Delete" asp-route-id="@question.Id" method="post" onsubmit="return confirm('Diese Frage wirklich löschen?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="alert alert-info shadow-sm">Bisher wurden keine Prüfungsfragen für dieses Kapitel hinterlegt.</div>
+    }
+</div>

@@ -1,0 +1,68 @@
+@model IEnumerable<WeProject.Models.Course>
+
+@{
+    ViewData["Title"] = "Lehrveranstaltungen";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Verwaltung der Lehrveranstaltungen</h2>
+        <a asp-action="Create" class="btn btn-success fw-bold shadow-sm">Neue Veranstaltung anlegen</a>
+    </div>
+
+    <table class="table table-hover table-bordered shadow-sm bg-white">
+        <thead class="table-dark">
+            <tr>
+                <th>Titel</th>
+                <th>Dozent</th>
+                <th>Typ</th>
+                <th>Kapitelübersicht</th>
+                <th>Prüfungen</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null && Model.Any())
+            {
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td class="align-middle"><strong>@item.Title</strong></td>
+                        <td class="align-middle">@item.LecturerName</td>
+                        <td class="align-middle">@(item.IsMasterCourse ? "Master" : "Bachelor")</td>
+                        <td class="align-middle">
+                            <a asp-controller="Chapter" asp-action="Index" asp-route-courseId="@item.Id" class="btn btn-primary position-relative btn-sm">
+                                Kapitel
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                    @(item.Chapters?.Count ?? 0)
+                                </span>
+                            </a>
+                        </td>
+                        <td class="align-middle">
+                            <a asp-controller="Exam" asp-action="Index" asp-route-courseId="@item.Id" class="btn btn-warning position-relative btn-sm fw-bold text-dark">
+                                Prüfungen
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-dark text-white">
+                                    @(item.Exams?.Count ?? 0)
+                                </span>
+                            </a>
+                        </td>
+                        <td class="align-middle">
+                            <div class="d-flex gap-2">
+                                <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Bearbeiten</a>
+                                <form asp-action="Delete" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Möchten Sie diese Lehrveranstaltung wirklich unwiderruflich löschen?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">Keine Lehrveranstaltungen vorhanden. Bitte legen Sie eine neue an.</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
