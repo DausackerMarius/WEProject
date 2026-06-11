@@ -1,0 +1,33 @@
+@{
+    ViewData["Title"] = "KI-Generator";
+}
+
+<div class="container mt-5">
+    <h2 class="mb-4">🎓 KI-Klausur-Generator</h2>
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger">@ViewBag.Error</div>
+    }
+
+    <div class="card p-4 shadow-sm mb-4">
+        <form asp-controller="Generator" asp-action="UploadAndGenerate" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="pdfFile" class="form-label">Wähle dein Vorlesungs-PDF aus:</label>
+                <input type="file" name="pdfFile" id="pdfFile" class="form-control" accept=".pdf" required />
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Magie starten & Fragen generieren</button>
+        </form>
+    </div>
+
+    @if (ViewBag.Result != null)
+    {
+        <div class="card p-4 border-success">
+            <h4 class="text-success">Erfolgreich generiert!</h4>
+            <p class="text-muted">PDF gespeichert in Azurite unter: <code>@ViewBag.CloudUrl</code></p>
+            <hr />
+            <h5>Die Antwort der KI (Rohes JSON):</h5>
+            <pre class="bg-light p-3 rounded"><code>@ViewBag.Result</code></pre>
+        </div>
+    }
+</div>

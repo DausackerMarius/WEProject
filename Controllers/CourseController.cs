@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WeProject.Data;
 using WeProject.Models;
+using System.Threading.Tasks;
 
 namespace WeProject.Controllers
 {
@@ -9,31 +10,29 @@ namespace WeProject.Controllers
     {
         private readonly AppDbContext _context;
 
-        // Die Datenbank wird hier per "Dependency Injection" automatisch übergeben
         public CourseController(AppDbContext context)
         {
             _context = context;
         }
 
-        // Diese Methode lädt die Liste der Kurse für die Startseite
+        // GET: Course
         public async Task<IActionResult> Index()
         {
-            // Wir laden alle Kurse UND inkludieren die Kapitel, damit wir sie zählen können
+            // Lädt alle Kurse inkl. Kapitel UND Prüfungen für die Badge-Zähler
             var courses = await _context.Courses
                                         .Include(c => c.Chapters)
+                                        .Include(c => c.Exams)
                                         .ToListAsync();
             return View(courses);
         }
 
-        // --- NEUE LOGIK START ---
-
-        // GET: Zeigt das Formular zum Erstellen eines neuen Kurses an
+        // GET: Course/Create
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Nimmt die Formulardaten entgegen und speichert sie
+        // POST: Course/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Title,LecturerName,IsMasterCourse")] Course course)
@@ -42,11 +41,74 @@ namespace WeProject.Controllers
             {
                 _context.Add(course);
                 await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index)); // Nach dem Speichern zurück zur Liste
+                TempData["Success"] = "Der Kurs wurde erfolgreich erstellt.";
+                return RedirectToAction(nameof(Index));
             }
-            return View(course); // Falls Fehler (z.B. Titel vergessen), zeige Formular erneut
+            return View(course);
         }
 
-        // --- NEUE LOGIK ENDE ---
+        // GET: Course/Edit/5
+        [HttpGet]
+        public async Task<IActionResult> Edit(int id)
+        {
+            var course = await _context.Courses.FindAsync(id);
+            if (course == null)
+            {
+                return NotFound();
+            }
+            return View(course);
+        }
+
+        // POST: Course/Edit/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Title,LecturerName,IsMasterCourse")] Course course)
+        {
+            if (id != course.Id)
+            {
+                return NotFound();
+            }
+
+            if (ModelState.IsValid)
+            {
+                try
+                {
+                    _context.Update(course);
+                    await _context.SaveChangesAsync();
+                    TempData["Success"] = "Der Kurs wurde erfolgreich aktualisiert.";
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!_context.Courses.Any(e => e.Id == course.Id))
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+                return RedirectToAction(nameof(Index));
+            }
+            return View(course);
+        }
+
+        // POST: Course/Delete/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var course = await _context.Courses.FindAsync(id);
+            if (course == null)
+            {
+                return NotFound();
+            }
+
+            // Kaskadierendes Löschen durch EF Core entfernt auch Kapitel und Prüfungen
+            _context.Courses.Remove(course);
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "Der Kurs wurde gelöscht.";
+            return RedirectToAction(nameof(Index));
+        }
     }
 }

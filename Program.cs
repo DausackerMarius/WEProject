@@ -11,12 +11,18 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 3. NEU: Den Azure Cloud Storage Service registrieren (Best Practice für die Architektur-Wertung)
+// 3. Zurück zum echten Cloud-Service (spricht jetzt über den Connection String mit dem Azurite-Emulator)
 builder.Services.AddScoped<IPdfStorageService, PdfStorageService>();
+
+// 4. OpenAI-Schnittstelle registrieren (Das KI-Gehirn bleibt erhalten)
+builder.Services.AddScoped<IOpenAiService, OpenAiService>();
+
+// 5. Den PDF-Übersetzer registrieren (MUSS VOR builder.Build() STEHEN!)
+builder.Services.AddScoped<PdfTextExtractionService>();
 
 var app = builder.Build();
 
-// 4. Automatische Datenbank-Initialisierung beim Start
+// 6. Automatische Datenbank-Initialisierung beim Start
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -27,7 +33,7 @@ using (var scope = app.Services.CreateScope())
     // SeedData.Initialize(services);
 }
 
-// 5. HTTP-Pipeline konfigurieren
+// 7. HTTP-Pipeline konfigurieren
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -41,7 +47,7 @@ app.UseRouting();
 
 app.UseAuthorization();
 
-// 6. Standard-Routing festlegen
+// 8. Standard-Routing festlegen
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
