@@ -1,110 +1,145 @@
 @model WeProject.Models.Chapter
-
 @{
-    ViewData["Title"] = "Prüfungsfragen - " + Model.Title;
+    ViewData["Title"] = "Prüfungsfragen";
 }
 
-<div class="container mt-4">
-    <div class="mb-4">
-        <a asp-controller="Course" asp-action="Details" asp-route-id="@Model.CourseId" class="btn btn-outline-secondary">
-            &larr; Zurück zur Kapitelübersicht
-        </a>
-    </div>
+<div class="container mt-5">
+    
+    <a href="/Course" class="btn btn-outline-secondary mb-4">← Zurück zu den Lehrveranstaltungen</a>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
 
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">Prüfungsfragen: @Model.Title</h2>
-        <div class="d-flex gap-2">
-            <a asp-controller="Question" asp-action="Create" asp-route-chapterId="@Model.Id" class="btn btn-success fw-bold shadow-sm">
-                Frage manuell anlegen
-            </a>
-            <button type="button" class="btn btn-warning fw-bold text-dark shadow-sm" data-bs-toggle="modal" data-bs-target="#kiUploadModal">
-                Neue Frage generieren
+        <h2>Prüfungsfragen: @Model.Title</h2>
+        <div>
+            <a asp-controller="Question" asp-action="Create" asp-route-chapterId="@Model.Id" class="btn btn-success me-2 fw-bold shadow-sm">Frage manuell anlegen</a>
+            
+            <button type="button" class="btn btn-warning fw-bold text-dark shadow-sm" data-bs-toggle="modal" data-bs-target="#kiGeneratorModal">
+                Neue Fragen per KI generieren
             </button>
         </div>
     </div>
 
-    @if (TempData["Error"] != null)
+    @if (Model.Questions != null && Model.Questions.Any())
     {
-        <div class="alert alert-danger shadow-sm">@TempData["Error"]</div>
-    }
-    @if (TempData["Success"] != null)
-    {
-        <div class="alert alert-success shadow-sm">@TempData["Success"]</div>
-    }
-
-    <div class="mt-4">
-        @if (Model.Questions != null && Model.Questions.Any())
+        @foreach (var question in Model.Questions)
         {
-            @foreach (var question in Model.Questions)
-            {
-                <div class="card shadow-sm mb-4 border-0 box-shadow">
-                    <div class="card-header bg-secondary bg-opacity-10 fw-bold text-dark fs-5 py-3">
-                        @question.Text
-                    </div>
-                    <div class="card-body p-0">
-                        <ul class="list-group list-group-flush">
-                            @if (question.AnswerOptions != null)
+            <div class="card mb-4 shadow-sm border-secondary">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-3">@question.Text</h5>
+                    <ul class="list-group list-group-flush mb-3">
+                        @if (question.AnswerOptions != null)
+                        {
+                            @foreach (var option in question.AnswerOptions)
                             {
-                                @foreach (var option in question.AnswerOptions)
-                                {
-                                    <li class="list-group-item d-flex align-items-center gap-3 py-3 @(option.IsCorrect ? "bg-success bg-opacity-10" : "")">
-                                        @if (option.IsCorrect)
-                                        {
-                                            <span class="badge bg-success px-3 py-2">Korrekt</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-secondary px-3 py-2">Falsch</span>
-                                        }
-                                        <span class="fs-6">@option.Text</span>
-                                    </li>
-                                }
+                                string badgeClass = option.IsCorrect ? "bg-success" : "bg-secondary";
+                                string badgeText = option.IsCorrect ? "Korrekt" : "Falsch";
+                                string textClass = option.IsCorrect ? "fw-bold text-success" : "text-muted";
+
+                                <li class="list-group-item d-flex align-items-center">
+                                    <span class="badge @badgeClass me-3 p-2" style="width: 70px; text-align: center;">@badgeText</span>
+                                    <span class="@textClass">@option.Text</span>
+                                </li>
                             }
-                        </ul>
-                    </div>
-                    <div class="card-footer bg-white d-flex justify-content-end gap-2 py-2 border-top">
-                        <a asp-controller="Question" asp-action="Edit" asp-route-id="@question.Id" class="btn btn-sm btn-outline-primary px-3 fw-bold">Bearbeiten</a>
-                        <form asp-controller="Question" asp-action="Delete" asp-route-id="@question.Id" method="post" onsubmit="return confirm('Möchten Sie diese Frage wirklich löschen?');" class="m-0">
-                            <button type="submit" class="btn btn-sm btn-outline-danger px-3 fw-bold">Löschen</button>
+                        }
+                    </ul>
+                    
+                    <div class="d-flex justify-content-end align-items-center">
+                        <form asp-controller="Question" asp-action="ValidateQuestion" method="post" class="m-0 p-0 me-2">
+                            <input type="hidden" name="questionId" value="@question.Id" />
+                            <input type="hidden" name="chapterId" value="@Model.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-info fw-bold">🤖 Durch KI prüfen lassen</button>
+                        </form>
+                        
+                        <a asp-controller="Question" asp-action="Edit" asp-route-id="@question.Id" class="btn btn-sm btn-outline-primary me-2">Bearbeiten</a>
+                        
+                        <form asp-controller="Question" asp-action="Delete" asp-route-id="@question.Id" method="post" class="m-0 p-0" onsubmit="return confirm('Möchtest du diese Frage wirklich löschen?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
                         </form>
                     </div>
+
                 </div>
-            }
-        }
-        else
-        {
-            <div class="alert alert-secondary text-center py-5 shadow-sm border-0">
-                <p class="mb-2 fs-5 text-muted">Bisher wurden keine Prüfungsfragen für dieses Kapitel angelegt.</p>
-                <small class="text-muted">Nutze die Buttons oben, um manuell Fragen hinzuzufügen oder ein Vorlesungs-PDF per KI analysieren zu lassen!</small>
             </div>
         }
-    </div>
+    }
+    else
+    {
+        <div class="alert alert-info text-center p-4 shadow-sm">
+            <p class="mb-2">Noch keine Prüfungsfragen für dieses Kapitel vorhanden.</p>
+            <small class="text-muted">Klicke oben rechts auf <strong>"Neue Fragen per KI generieren"</strong>, um deinen Klausur-Pool zu füllen!</small>
+        </div>
+    }
 </div>
 
-<div class="modal fade" id="kiUploadModal" tabindex="-1" aria-labelledby="kiUploadModalLabel" aria-hidden="true">
+<div class="modal fade" id="kiGeneratorModal" tabindex="-1" aria-labelledby="kiGeneratorModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
+        <div class="modal-content border-warning">
             <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title fw-bold" id="kiUploadModalLabel">✨ KI-Fragen für dieses Kapitel generieren</h5>
+                <h5 class="modal-title fw-bold" id="kiGeneratorModalLabel">✨ KI-Fragen für den Klausur-Pool</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form asp-controller="Generator" asp-action="GenerateForChapter" method="post" enctype="multipart/form-data">
-                <div class="modal-body py-4">
-                    <input type="hidden" name="chapterId" value="@Model.Id" />
-                    
+                <input type="hidden" name="chapterId" value="@Model.Id" />
+                <div class="modal-body">
                     <div class="mb-3">
-                        <label for="pdfFile" class="form-label fw-bold">Wähle das Vorlesungs-PDF aus:</label>
-                        <input type="file" name="pdfFile" id="pdfFile" class="form-control form-control-lg" accept=".pdf" required />
+                        <label for="pdfFile" class="form-label fw-bold">Vorlesungs-PDF hochladen:</label>
+                        <input type="file" name="pdfFile" id="pdfFile" class="form-control" accept=".pdf" required />
                     </div>
-                    <div class="alert alert-info border-0 mb-0 small text-muted">
-                        <strong>Ablauf:</strong> Das Skript lädt das PDF in den lokalen Azurite-Emulator hoch, liest den Text mittels <em>PdfPig</em> aus und schickt diesen an OpenAI. Die generierten Multiple-Choice-Fragen werden direkt in deine SQLite-Datenbank geschrieben.
+                    <div class="mb-3">
+                        <label for="questionCount" class="form-label fw-bold">Wie viele Fragen sollen generiert werden?</label>
+                        <input type="number" name="questionCount" id="questionCount" class="form-control" value="5" min="1" max="10" required />
                     </div>
                 </div>
-                <div class="modal-footer bg-light border-top-0">
-                    <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Abbrechen</button>
-                    <button type="submit" class="btn btn-warning fw-bold text-dark">Generieren starten</button>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-warning fw-bold text-dark">Zur Vorschau generieren</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+@if (TempData["ValidationResult"] != null)
+{
+    <div class="modal fade show d-block" id="validationModal" tabindex="-1" aria-modal="true" role="dialog" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-info shadow-lg">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title fw-bold">🤖 KI-Gutachten</h5>
+                    <button type="button" class="btn-close btn-close-white" onclick="closeValidationModal()"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <h6 class="fw-bold text-secondary">Die geprüfte Frage:</h6>
+                    <p class="mb-4 fst-italic border-start border-3 border-secondary ps-3">@TempData["ValidatedQuestionText"]</p>
+                    
+                    <h6 class="fw-bold text-info">Urteil der KI:</h6>
+                    <div class="alert alert-light border border-info mb-0">
+                        @TempData["ValidationResult"]
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeValidationModal()">Verstanden</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function closeValidationModal() {
+            document.getElementById('validationModal').classList.remove('show', 'd-block');
+        }
+    </script>
+}

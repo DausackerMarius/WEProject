@@ -5,6 +5,8 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Text.Json;
 using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
 using WeProject.Services;
 using WeProject.Data;
 using WeProject.Models;
@@ -30,7 +32,6 @@ namespace WeProject.Controllers
             _context = context;
         }
 
-        // Das globale Labor für studentische Testzwecke
         [HttpGet]
         public IActionResult Index()
         {
@@ -38,7 +39,7 @@ namespace WeProject.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> UploadAndGenerate(IFormFile pdfFile)
+        public async Task<IActionResult> UploadAndGenerate(IFormFile pdfFile, string mode = "student", int questionCount = 3)
         {
             if (pdfFile == null || pdfFile.Length == 0) 
             {
@@ -46,40 +47,47 @@ namespace WeProject.Controllers
                 return View("Index");
             }
 
+            ViewBag.Mode = mode;
             var cloudUrl = await _storageService.UploadPdfAsync(pdfFile);
             string tempPath = Path.GetTempFileName();
             using (var stream = new FileStream(tempPath, FileMode.Create))
             {
                 await pdfFile.CopyToAsync(stream);
             }
-
             string extractedText = _pdfExtractionService.ExtractTextFromPdf(tempPath);
             System.IO.File.Delete(tempPath);
 
-            string jsonResult = await _openAiService.GenerateQuestionsFromTextAsync(extractedText);
+            try
+            {
+                string jsonResult = await _openAiService.GenerateQuestionsFromTextAsync(extractedText, questionCount);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                ViewBag.Questions = JsonSerializer.Deserialize<List<AiQuestionModel>>(jsonResult, options);
+            }
+            catch (HttpRequestException ex) when (ex.Message.Contains("503"))
+            {
+                ViewBag.Error = "Die KI-Server sind aktuell ausgelastet. Bitte warte kurz und versuche es erneut.";
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = $"Ein unerwarteter Fehler ist aufgetreten: {ex.Message}";
+            }
 
-            ViewBag.Result = jsonResult;
             ViewBag.CloudUrl = cloudUrl;
-
             return View("Index");
         }
 
         // ==========================================
-        // Die scharfe Logik zum Speichern in die DB
+        // 1. KI aufrufen & Vorschau anzeigen
         // ==========================================
         [HttpPost]
-        public async Task<IActionResult> GenerateForChapter(IFormFile pdfFile, int chapterId)
+        public async Task<IActionResult> GenerateForChapter(IFormFile pdfFile, int chapterId, int questionCount = 3)
         {
             if (pdfFile == null || pdfFile.Length == 0)
             {
-                // Fallback, falls kein PDF gewählt wurde
-                return RedirectToAction("Index", "Chapter", new { id = chapterId });
+                return RedirectToAction("Index", "Question", new { chapterId = chapterId });
             }
 
-            // 1. PDF im Emulator (Azurite) hochladen
             await _storageService.UploadPdfAsync(pdfFile);
-
-            // 2. Text extrahieren
             string tempPath = Path.GetTempFileName();
             using (var stream = new FileStream(tempPath, FileMode.Create))
             {
@@ -88,59 +96,87 @@ namespace WeProject.Controllers
             string extractedText = _pdfExtractionService.ExtractTextFromPdf(tempPath);
             System.IO.File.Delete(tempPath);
 
-            // 3. KI-Antwort abholen
-            string jsonResult = await _openAiService.GenerateQuestionsFromTextAsync(extractedText);
-
             try
             {
-                // 4. JSON in Hilfsobjekte parsen
+                // HIER: Die korrekte Übergabe an das aktualisierte Interface
+                string jsonResult = await _openAiService.GenerateQuestionsFromTextAsync(extractedText, questionCount);
+                
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 var generatedQuestions = JsonSerializer.Deserialize<List<AiQuestionModel>>(jsonResult, options);
 
-                if (generatedQuestions != null)
+                var viewModel = new PreviewViewModel 
                 {
-                    foreach (var aiQ in generatedQuestions)
-                    {
-                        // 5. In deine exakten Domain Models umwandeln
-                        var newQuestion = new Question
-                        {
-                            Text = aiQ.Frage,
-                            ChapterId = chapterId, // Zuweisung zum Kapitel
-                            AnswerOptions = new List<AnswerOption>()
-                        };
+                    ChapterId = chapterId,
+                    Questions = generatedQuestions ?? new List<AiQuestionModel>()
+                };
 
-                        // Antworten hinzufügen
-                        for (int i = 0; i < aiQ.Antworten.Count; i++)
-                        {
-                            newQuestion.AnswerOptions.Add(new AnswerOption 
-                            {
-                                Text = aiQ.Antworten[i],
-                                IsCorrect = (i == aiQ.KorrekteAntwortIndex),
-                                QuestionId = default // Signalisiert EF Core den "Transient"-Zustand
-                            });
-                        }
-
-                        _context.Questions.Add(newQuestion);
-                    }
-
-                    // Alles in die SQLite-Datenbank schreiben
-                    await _context.SaveChangesAsync();
-                }
+                return View("Preview", viewModel);
+            }
+            catch (HttpRequestException ex) when (ex.Message.Contains("503"))
+            {
+                TempData["Error"] = "Die KI-Server sind aktuell ausgelastet. Bitte versuche es in ein paar Minuten noch einmal.";
             }
             catch (Exception ex)
             {
                 TempData["Error"] = "Fehler beim Verarbeiten der KI-Fragen: " + ex.Message;
             }
 
-            return RedirectToAction("Index", "Chapter", new { id = chapterId });
+            return RedirectToAction("Index", "Question", new { chapterId = chapterId });
+        }
+
+        // ==========================================
+        // 2. Nur die ausgewählten Fragen speichern!
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> SaveSelectedQuestions(int chapterId, List<AiQuestionModel> questions, List<int> selectedIndices)
+        {
+            if (selectedIndices != null && selectedIndices.Any())
+            {
+                foreach (var index in selectedIndices)
+                {
+                    var aiQ = questions[index];
+                    var newQuestion = new Question
+                    {
+                        Text = aiQ.Frage,
+                        ChapterId = chapterId, 
+                        AnswerOptions = new List<AnswerOption>()
+                    };
+
+                    for (int i = 0; i < aiQ.Antworten.Count; i++)
+                    {
+                        newQuestion.AnswerOptions.Add(new AnswerOption 
+                        {
+                            Text = aiQ.Antworten[i],
+                            IsCorrect = (i == aiQ.KorrekteAntwortIndex),
+                            QuestionId = default 
+                        });
+                    }
+                    _context.Questions.Add(newQuestion);
+                }
+                
+                await _context.SaveChangesAsync();
+                TempData["Success"] = $"{selectedIndices.Count} Frage(n) erfolgreich in den Klausur-Pool aufgenommen!";
+            }
+            else
+            {
+                TempData["Error"] = "Du hast keine Fragen ausgewählt. Es wurde nichts gespeichert.";
+            }
+
+            return RedirectToAction("Index", "Question", new { chapterId = chapterId });
         }
     }
 
-    // Hilfsklasse für das JSON-Parsing
+    // Hilfsklassen
     public class AiQuestionModel
     {
         public string Frage { get; set; } = string.Empty;
         public List<string> Antworten { get; set; } = new List<string>();
         public int KorrekteAntwortIndex { get; set; }
+    }
+
+    public class PreviewViewModel
+    {
+        public int ChapterId { get; set; }
+        public List<AiQuestionModel> Questions { get; set; } = new List<AiQuestionModel>();
     }
 }

@@ -1,68 +1,85 @@
 @model IEnumerable<WeProject.Models.Course>
-
 @{
     ViewData["Title"] = "Lehrveranstaltungen";
 }
 
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Verwaltung der Lehrveranstaltungen</h2>
+<div class="container mt-5">
+    
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📚 Verwaltung der Lehrveranstaltungen</h2>
         <a asp-action="Create" class="btn btn-success fw-bold shadow-sm">Neue Veranstaltung anlegen</a>
     </div>
 
-    <table class="table table-hover table-bordered shadow-sm bg-white">
-        <thead class="table-dark">
-            <tr>
-                <th>Titel</th>
-                <th>Dozent</th>
-                <th>Typ</th>
-                <th>Kapitelübersicht</th>
-                <th>Prüfungen</th>
-                <th>Aktionen</th>
-            </tr>
-        </thead>
-        <tbody>
-            @if (Model != null && Model.Any())
-            {
-                @foreach (var item in Model)
-                {
-                    <tr>
-                        <td class="align-middle"><strong>@item.Title</strong></td>
-                        <td class="align-middle">@item.LecturerName</td>
-                        <td class="align-middle">@(item.IsMasterCourse ? "Master" : "Bachelor")</td>
-                        <td class="align-middle">
-                            <a asp-controller="Chapter" asp-action="Index" asp-route-courseId="@item.Id" class="btn btn-primary position-relative btn-sm">
-                                Kapitel
-                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                    @(item.Chapters?.Count ?? 0)
-                                </span>
-                            </a>
-                        </td>
-                        <td class="align-middle">
-                            <a asp-controller="Exam" asp-action="Index" asp-route-courseId="@item.Id" class="btn btn-warning position-relative btn-sm fw-bold text-dark">
-                                Prüfungen
-                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-dark text-white">
-                                    @(item.Exams?.Count ?? 0)
-                                </span>
-                            </a>
-                        </td>
-                        <td class="align-middle">
-                            <div class="d-flex gap-2">
-                                <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Bearbeiten</a>
-                                <form asp-action="Delete" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Möchten Sie diese Lehrveranstaltung wirklich unwiderruflich löschen?');">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                }
-            }
-            else
-            {
-                <tr>
-                    <td colspan="6" class="text-center text-muted py-4">Keine Lehrveranstaltungen vorhanden. Bitte legen Sie eine neue an.</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    @if (Model != null && Model.Any())
+    {
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th scope="col" style="width: 25%;">Titel</th>
+                            <th scope="col" style="width: 20%;">Dozent</th>
+                            <th scope="col" style="width: 10%;">Typ</th>
+                            <th scope="col" style="width: 15%;" class="text-center">Kapitelübersicht</th>
+                            <th scope="col" style="width: 15%;" class="text-center">Prüfungen</th>
+                            <th scope="col" style="width: 15%;" class="text-end">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var course in Model)
+                        {
+                            <tr>
+                                <td class="fw-bold">@course.Title</td>
+                                <td>@course.LecturerName</td>
+                                <td>
+                                    <span class="badge @(course.IsMasterCourse ? "bg-info text-dark" : "bg-secondary")">
+                                        @(course.IsMasterCourse ? "Master" : "Bachelor")
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <a href="/Chapter?courseId=@course.Id" class="btn btn-primary btn-sm position-relative shadow-sm">
+                                        Kapitel
+                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
+                                            @course.Chapters.Count
+                                        </span>
+                                    </a>
+                                </td>
+                                <td class="text-center">
+                                    <a href="/Exam?courseId=@course.Id" class="btn btn-warning btn-sm position-relative text-dark fw-bold shadow-sm">
+                                        Prüfungen
+                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-dark border border-light">
+                                            @course.Exams.Count
+                                        </span>
+                                    </a>
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-flex justify-content-end align-items-center">
+                                        <a asp-action="Edit" asp-route-id="@course.Id" class="btn btn-sm btn-outline-primary me-2">Bearbeiten</a>
+                                        <form asp-action="Delete" asp-route-id="@course.Id" method="post" class="m-0" onsubmit="return confirm('ACHTUNG: Möchtest du diesen Kurs und ALLE dazugehörigen Kapitel, Fragen und Prüfungen restlos löschen?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info text-center p-4">
+            <p class="mb-2">Es sind noch keine Lehrveranstaltungen im System hinterlegt.</p>
+            <small class="text-muted">Klicke oben rechts auf <strong>"Neue Veranstaltung anlegen"</strong>, um zu starten!</small>
+        </div>
+    }
 </div>

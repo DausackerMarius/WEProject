@@ -14,8 +14,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // 3. Zurück zum echten Cloud-Service (spricht jetzt über den Connection String mit dem Azurite-Emulator)
 builder.Services.AddScoped<IPdfStorageService, PdfStorageService>();
 
-// 4. OpenAI-Schnittstelle registrieren (Das KI-Gehirn bleibt erhalten)
-builder.Services.AddScoped<IOpenAiService, OpenAiService>();
+// 4. KI-Schnittstelle registrieren (Das KI-Gehirn bleibt erhalten, läuft im Hintergrund jetzt aber über Gemini)
+builder.Services.AddHttpClient<IOpenAiService, GeminiService>();
 
 // 5. Den PDF-Übersetzer registrieren (MUSS VOR builder.Build() STEHEN!)
 builder.Services.AddScoped<PdfTextExtractionService>();
@@ -29,8 +29,8 @@ using (var scope = app.Services.CreateScope())
     var context = services.GetRequiredService<AppDbContext>();
     context.Database.EnsureCreated();
     
-    // Falls eure SeedData-Klasse eine Initialize-Methode besitzt, kann sie hier aktiv sein:
-    // SeedData.Initialize(services);
+    // HIER: Der Seeder ist jetzt scharfgeschaltet und befüllt deine Datenbank!
+    SeedData.Initialize(services);
 }
 
 // 7. HTTP-Pipeline konfigurieren

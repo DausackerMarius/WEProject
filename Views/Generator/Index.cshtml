@@ -3,7 +3,8 @@
 }
 
 <div class="container mt-5">
-    <h2 class="mb-4">🎓 KI-Klausur-Generator</h2>
+    <h2 class="mb-4">🎓 Globales KI-Labor (Testbereich)</h2>
+    <p class="text-muted mb-4">Hier kannst du PDFs hochladen und sofort testen, wie die KI reagiert. Diese Fragen werden <strong>nicht</strong> in der Datenbank gespeichert.</p>
 
     @if (ViewBag.Error != null)
     {
@@ -12,22 +13,108 @@
 
     <div class="card p-4 shadow-sm mb-4">
         <form asp-controller="Generator" asp-action="UploadAndGenerate" method="post" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label for="pdfFile" class="form-label">Wähle dein Vorlesungs-PDF aus:</label>
-                <input type="file" name="pdfFile" id="pdfFile" class="form-control" accept=".pdf" required />
+            
+            <div class="row mb-3">
+                <div class="col-md-12 mb-3">
+                    <label for="pdfFile" class="form-label fw-bold">Wähle dein Vorlesungs-PDF aus:</label>
+                    <input type="file" name="pdfFile" id="pdfFile" class="form-control" accept=".pdf" required />
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="questionCount" class="form-label fw-bold">Anzahl der Fragen:</label>
+                    <input type="number" name="questionCount" id="questionCount" class="form-control" value="3" min="1" max="10" required />
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="mode" class="form-label fw-bold">Ansichts-Modus:</label>
+                    <select name="mode" id="mode" class="form-select">
+                        <option value="student">👨‍🎓 Studenten-Modus (Interaktiver Selbsttest)</option>
+                        <option value="professor">👨‍🏫 Dozenten-Modus (Lösungen direkt anzeigen)</option>
+                    </select>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary w-100">Magie starten & Fragen generieren</button>
+
+            <button type="submit" class="btn btn-primary w-100 mt-2 fw-bold">Magie starten & Fragen generieren</button>
         </form>
     </div>
 
-    @if (ViewBag.Result != null)
+    @if (ViewBag.Questions != null)
     {
-        <div class="card p-4 border-success">
-            <h4 class="text-success">Erfolgreich generiert!</h4>
-            <p class="text-muted">PDF gespeichert in Azurite unter: <code>@ViewBag.CloudUrl</code></p>
+        <div class="card p-4 border-success shadow-sm">
+            <h4 class="text-success mb-3">Erfolgreich generiert!</h4>
+            <p class="text-muted small">Modus: @(ViewBag.Mode == "student" ? "Selbsttest" : "Lösungen angezeigt") | PDF in Azurite: <code>@ViewBag.CloudUrl</code></p>
             <hr />
-            <h5>Die Antwort der KI (Rohes JSON):</h5>
-            <pre class="bg-light p-3 rounded"><code>@ViewBag.Result</code></pre>
+            
+            <h5 class="mb-4 text-secondary">Deine generierten Fragen:</h5>
+            
+            @foreach (var q in ViewBag.Questions)
+            {
+                <div class="card mb-4 shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white fs-5">
+                        <strong>Frage:</strong> @q.Frage
+                    </div>
+                    
+                    @if (ViewBag.Mode == "professor")
+                    {
+                        <ul class="list-group list-group-flush">
+                            @for (int i = 0; i < q.Antworten.Count; i++)
+                            {
+                                bool isCorrect = (i == q.KorrekteAntwortIndex);
+                                string cssClass = isCorrect ? "list-group-item-success fw-bold" : "";
+
+                                <li class="list-group-item @cssClass">
+                                    <span class="me-3 text-muted">@((char)('A' + i))</span> 
+                                    @q.Antworten[i]
+                                    @if (isCorrect) { <span class="badge bg-success float-end mt-1">Korrekt</span> }
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @for (int i = 0; i < q.Antworten.Count; i++)
+                            {
+                                bool isCorrect = (i == q.KorrekteAntwortIndex);
+                                
+                                <button type="button" class="list-group-item list-group-item-action text-start" 
+                                        data-correct="@isCorrect.ToString().ToLower()" 
+                                        onclick="checkAnswer(this, @isCorrect.ToString().ToLower())">
+                                    <span class="me-3 text-muted fw-bold">@((char)('A' + i))</span> 
+                                    @q.Antworten[i]
+                                </button>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
         </div>
     }
 </div>
+
+<script>
+    function checkAnswer(btn, isCorrect) {
+        const listGroup = btn.closest('ul');
+        const buttons = listGroup.querySelectorAll('button');
+        
+        buttons.forEach(b => {
+            b.disabled = true;
+            b.classList.remove('list-group-item-action');
+        });
+
+        if (isCorrect) {
+            btn.classList.add('list-group-item-success', 'fw-bold');
+            btn.innerHTML += '<span class="badge bg-success float-end mt-1">Richtig! 🎉</span>';
+        } else {
+            btn.classList.add('list-group-item-danger');
+            btn.innerHTML += '<span class="badge bg-danger float-end mt-1">Falsch ❌</span>';
+            
+            buttons.forEach(b => {
+                if (b.dataset.correct === "true") {
+                    b.classList.add('list-group-item-success');
+                    b.innerHTML += '<span class="badge bg-success float-end mt-1">Das wäre richtig</span>';
+                }
+            });
+        }
+    }
+</script>

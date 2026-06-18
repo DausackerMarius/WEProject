@@ -1,11 +1,14 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace WeProject.Services
 {
     public interface IOpenAiService
     {
-        // Die Methode nimmt später einfach nur den rohen Text aus dem PDF 
-        // und gibt einen fertigen JSON-String mit den Multiple-Choice-Fragen zurück.
-        Task<string> GenerateQuestionsFromTextAsync(string documentText);
+        // Bisherige Methode
+        Task<string> GenerateQuestionsFromTextAsync(string documentText, int questionCount);
+        
+        // NEU: Die Methode zum Prüfen einer bestehenden Frage
+        Task<string> ValidateQuestionAsync(string questionText, List<string> answers);
     }
 }

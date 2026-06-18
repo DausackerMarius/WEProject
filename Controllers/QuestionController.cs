@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WeProject.Data;
 using WeProject.Models;
+using WeProject.Services; // Wichtig für IOpenAiService
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -10,10 +12,13 @@ namespace WeProject.Controllers
     public class QuestionController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly IOpenAiService _openAiService; // KI-Service hinzugefügt
 
-        public QuestionController(AppDbContext context)
+        // Konstruktor angepasst, um die KI aufzunehmen
+        public QuestionController(AppDbContext context, IOpenAiService openAiService)
         {
             _context = context;
+            _openAiService = openAiService;
         }
 
         // GET: Question?chapterId=X
@@ -47,11 +52,9 @@ namespace WeProject.Controllers
         {
             if (ModelState.IsValid && options != null && options.Length == 4)
             {
-                // 1. Frage in der Datenbank speichern
                 _context.Questions.Add(question);
                 await _context.SaveChangesAsync(); 
 
-                // 2. Die 4 zugehörigen Antwortoptionen anlegen
                 for (int i = 0; i < 4; i++)
                 {
                     var option = new AnswerOption
@@ -83,7 +86,6 @@ namespace WeProject.Controllers
                 return NotFound();
             }
 
-            // Ermitteln, welche Option aktuell als korrekt markiert ist
             var optionsList = question.AnswerOptions.ToList();
             int correctIndex = optionsList.FindIndex(o => o.IsCorrect);
             ViewBag.CorrectOptionIndex = correctIndex >= 0 ? correctIndex : 0;
@@ -103,10 +105,8 @@ namespace WeProject.Controllers
 
             if (ModelState.IsValid && options != null && options.Length == 4 && optionIds != null && optionIds.Length == 4)
             {
-                // 1. Fragentext aktualisieren
                 _context.Update(question);
 
-                // 2. Bestehende Antwortoptionen über ihre IDs aktualisieren
                 for (int i = 0; i < 4; i++)
                 {
                     var existingOption = await _context.AnswerOptions.FindAsync(optionIds[i]);
@@ -141,12 +141,44 @@ namespace WeProject.Controllers
 
             int chapterId = question.ChapterId;
 
-            // Kaskadierendes Löschen der Optionen erzwingen
             _context.AnswerOptions.RemoveRange(question.AnswerOptions);
             _context.Questions.Remove(question);
             
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index), new { chapterId = chapterId });
+        }
+
+        // ========================================================
+        // NEU: HIER IST DAS KI-VALIDIERUNGS-MODUL
+        // ========================================================
+        [HttpPost]
+        public async Task<IActionResult> ValidateQuestion(int questionId, int chapterId)
+        {
+            var question = await _context.Questions
+                .Include(q => q.AnswerOptions)
+                .FirstOrDefaultAsync(q => q.Id == questionId);
+
+            if (question != null)
+            {
+                // Liste der Antworttexte für die KI extrahieren
+                var answers = question.AnswerOptions.Select(a => a.Text).ToList();
+                
+                try
+                {
+                    // KI befragen
+                    string feedback = await _openAiService.ValidateQuestionAsync(question.Text, answers);
+                    
+                    // Das Feedback an die View übergeben
+                    TempData["ValidationResult"] = feedback;
+                    TempData["ValidatedQuestionText"] = question.Text;
+                }
+                catch (Exception ex)
+                {
+                    TempData["Error"] = "Fehler bei der KI-Prüfung: " + ex.Message;
+                }
+            }
+            
+            return RedirectToAction("Index", new { chapterId = chapterId });
         }
     }
 }
