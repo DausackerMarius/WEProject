@@ -15,11 +15,7 @@
                     <form asp-action="Create" enctype="multipart/form-data">
                         <input type="hidden" asp-for="CourseId" value="@ViewBag.CourseId" />
 
-                        <div class="mb-3">
-                            <label asp-for="ChapterNumber" class="form-label fw-bold">Kapitelnummer</label>
-                            <input asp-for="ChapterNumber" class="form-control" type="number" min="1" required />
-                            <span asp-validation-for="ChapterNumber" class="text-danger"></span>
-                        </div>
+                        @* Das Feld für die Kapitelnummer wurde entfernt, da diese jetzt automatisch vergeben wird. *@
 
                         <div class="mb-4">
                             <label asp-for="Title" class="form-label fw-bold">Titel des Kapitels</label>

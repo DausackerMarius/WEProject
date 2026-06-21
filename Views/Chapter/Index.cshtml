@@ -66,9 +66,18 @@
                         <td class="align-middle">
                             <div class="d-flex gap-2">
                                 <a asp-action="Edit" asp-route-id="@chapter.Id" class="btn btn-sm btn-outline-secondary">Bearbeiten</a>
-                                <form asp-action="Delete" asp-route-id="@chapter.Id" method="post" onsubmit="return confirm('Möchten Sie dieses Kapitel wirklich löschen?');">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
-                                </form>
+                                <!-- NEUER LÖSCHEN-BUTTON -->
+                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteConfirmationModal"
+                                        data-delete-url="@Url.Action("Delete", "Chapter", new { id = chapter.Id })"
+                                        data-delete-main-text="Möchten Sie dieses Kapitel wirklich löschen?"
+                                        data-delete-item-name="@chapter.Title"
+                                        data-delete-item-line1="Nummer: @chapter.ChapterNumber"
+                                        data-delete-item-line2="Kurs: @(Model?.Title ?? "Unbekannt")"
+                                        data-delete-warning-text="Dieser Vorgang kann nicht rückgängig gemacht werden. Alle zugehörigen Fragen werden ebenfalls gelöscht.">
+                                    Löschen
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -83,3 +92,6 @@
         </tbody>
     </table>
 </div>
+
+<!-- Das Modal am Ende der Seite einbinden -->
+<partial name="_DeleteConfirmation" />

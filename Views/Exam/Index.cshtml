@@ -96,9 +96,17 @@
                             <div class="d-grid gap-2">
                                 <a asp-action="Print" asp-route-id="@exam.Id" target="_blank" class="btn btn-outline-primary fw-bold">Druckansicht öffnen</a>
                                 
-                                <form asp-action="Delete" asp-route-id="@exam.Id" method="post" onsubmit="return confirm('Möchten Sie diese generierte Prüfung wirklich löschen?');">
-                                    <button type="submit" class="btn btn-sm btn-link text-danger text-decoration-none">Prüfung verwerfen</button>
-                                </form>
+                                <!-- NEUER LÖSCHEN-BUTTON -->
+                                <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteConfirmationModal"
+                                        data-delete-url="@Url.Action("Delete", "Exam", new { id = exam.Id })"
+                                        data-delete-main-text="Möchten Sie diese Prüfung wirklich löschen?"
+                                        data-delete-item-name="Prüfung vom @exam.ExamDate.ToString("dd.MM.yyyy")"
+                                        data-delete-item-line1="@((exam.Questions != null ? exam.Questions.Count : 0) + " Fragen")"
+                                        data-delete-warning-text="Dieser Vorgang kann nicht rückgängig gemacht werden.">
+                                    Prüfung verwerfen
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -113,3 +121,6 @@
         }
     </div>
 </div>
+
+<!-- Das Modal am Ende der Seite einbinden -->
+<partial name="_DeleteConfirmation" />

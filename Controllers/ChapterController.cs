@@ -2,19 +2,19 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WeProject.Data;
 using WeProject.Models;
-using WeProject.Services; // Wichtig für den Zugriff auf den neuen Service
+using WeProject.Services;
 using Microsoft.AspNetCore.Http;
 using System.Linq;
 using System.Threading.Tasks;
+using System;
 
 namespace WeProject.Controllers
 {
     public class ChapterController : Controller
     {
         private readonly AppDbContext _context;
-        private readonly IPdfStorageService _storageService; // Nutzt jetzt das Cloud-Interface
+        private readonly IPdfStorageService _storageService;
 
-        // Der Konstruktor holt sich die Cloud-Schnittstelle per Dependency Injection
         public ChapterController(AppDbContext context, IPdfStorageService storageService)
         {
             _context = context;
@@ -49,20 +49,38 @@ namespace WeProject.Controllers
         // POST: Chapter/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Title,ChapterNumber,CourseId")] Chapter chapter, IFormFile? uploadedPdf)
+        public async Task<IActionResult> Create([Bind("Title,CourseId")] Chapter chapter, IFormFile? uploadedPdf) // ChapterNumber entfernt aus Bind
         {
             if (ModelState.IsValid)
             {
-                if (uploadedPdf != null && uploadedPdf.Length > 0)
+                try
                 {
-                    // Lädt die Datei direkt hoch in den Azure-Container und gibt die öffentliche URL zurück
-                    string? cloudUrl = await _storageService.UploadPdfAsync(uploadedPdf);
-                    chapter.PdfFilePath = cloudUrl;
-                }
+                    // Automatische fortlaufende Nummerierung für das neue Kapitel
+                    var maxChapterNumber = await _context.Chapters
+                        .Where(c => c.CourseId == chapter.CourseId)
+                        .Select(c => (int?)c.ChapterNumber)
+                        .MaxAsync() ?? 0;
+                    
+                    chapter.ChapterNumber = maxChapterNumber + 1;
 
-                _context.Add(chapter);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index), new { courseId = chapter.CourseId });
+                    if (uploadedPdf != null && uploadedPdf.Length > 0)
+                    {
+                        string? cloudUrl = await _storageService.UploadPdfAsync(uploadedPdf);
+                        chapter.PdfFilePath = cloudUrl;
+                    }
+
+                    _context.Add(chapter);
+                    await _context.SaveChangesAsync();
+                    return RedirectToAction(nameof(Index), new { courseId = chapter.CourseId });
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError("", $"Fehler bei der Speicherkonfiguration: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    ModelState.AddModelError("", $"Ein Fehler beim PDF-Upload ist aufgetreten: {ex.Message}");
+                }
             }
 
             ViewBag.CourseId = chapter.CourseId;
@@ -92,31 +110,39 @@ namespace WeProject.Controllers
 
             if (ModelState.IsValid)
             {
-                if (deleteFile)
+                try
                 {
-                    // Löscht das PDF restlos aus dem Azure Blob Storage Container
-                    if (!string.IsNullOrEmpty(chapter.PdfFilePath))
+                    if (deleteFile)
                     {
-                        await _storageService.DeletePdfAsync(chapter.PdfFilePath);
+                        if (!string.IsNullOrEmpty(chapter.PdfFilePath))
+                        {
+                            await _storageService.DeletePdfAsync(chapter.PdfFilePath);
+                        }
+                        chapter.PdfFilePath = null;
                     }
-                    chapter.PdfFilePath = null;
-                }
-                else if (uploadedPdf != null && uploadedPdf.Length > 0)
-                {
-                    // Falls bereits ein altes PDF existierte, wird dieses vorab aus Azure entfernt
-                    if (!string.IsNullOrEmpty(chapter.PdfFilePath))
+                    else if (uploadedPdf != null && uploadedPdf.Length > 0)
                     {
-                        await _storageService.DeletePdfAsync(chapter.PdfFilePath);
+                        if (!string.IsNullOrEmpty(chapter.PdfFilePath))
+                        {
+                            await _storageService.DeletePdfAsync(chapter.PdfFilePath);
+                        }
+
+                        string? cloudUrl = await _storageService.UploadPdfAsync(uploadedPdf);
+                        chapter.PdfFilePath = cloudUrl;
                     }
 
-                    // Upload des neuen Foliensatzes
-                    string? cloudUrl = await _storageService.UploadPdfAsync(uploadedPdf);
-                    chapter.PdfFilePath = cloudUrl;
+                    _context.Update(chapter);
+                    await _context.SaveChangesAsync();
+                    return RedirectToAction(nameof(Index), new { courseId = chapter.CourseId });
                 }
-
-                _context.Update(chapter);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index), new { courseId = chapter.CourseId });
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError("", $"Fehler bei der Speicherkonfiguration: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    ModelState.AddModelError("", $"Ein Fehler beim PDF-Upload ist aufgetreten: {ex.Message}");
+                }
             }
             return View(chapter);
         }

@@ -63,9 +63,17 @@
                                 <td class="text-end">
                                     <div class="d-flex justify-content-end align-items-center">
                                         <a asp-action="Edit" asp-route-id="@course.Id" class="btn btn-sm btn-outline-primary me-2">Bearbeiten</a>
-                                        <form asp-action="Delete" asp-route-id="@course.Id" method="post" class="m-0" onsubmit="return confirm('ACHTUNG: Möchtest du diesen Kurs und ALLE dazugehörigen Kapitel, Fragen und Prüfungen restlos löschen?');">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
-                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteConfirmationModal"
+                                                data-delete-url="@Url.Action("Delete", "Course", new { id = course.Id })"
+                                                data-delete-main-text="Möchten Sie diese Lehrveranstaltung wirklich löschen?"
+                                                data-delete-item-name="@course.Title"
+                                                data-delete-item-line1="Dozent: @course.LecturerName"
+                                                data-delete-item-line2="Studiengang: @(course.IsMasterCourse ? "Master" : "Bachelor")"
+                                                data-delete-warning-text="Dieser Vorgang kann nicht rückgängig gemacht werden. Alle zugehörigen Kapitel, Fragen und Prüfungen werden ebenfalls gelöscht.">
+                                            Löschen
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -83,3 +91,10 @@
         </div>
     }
 </div>
+
+<!-- Das Modal am Ende der Seite einbinden -->
+<partial name="_DeleteConfirmation" />
+
+@section Scripts {
+    <!-- Hier könnten bei Bedarf noch Seitenspezifische Skripte hin -->
+}

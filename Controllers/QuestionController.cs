@@ -2,8 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WeProject.Data;
 using WeProject.Models;
-using WeProject.Services; // Wichtig für IOpenAiService
+using WeProject.Services;
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -12,9 +13,8 @@ namespace WeProject.Controllers
     public class QuestionController : Controller
     {
         private readonly AppDbContext _context;
-        private readonly IOpenAiService _openAiService; // KI-Service hinzugefügt
+        private readonly IOpenAiService _openAiService;
 
-        // Konstruktor angepasst, um die KI aufzunehmen
         public QuestionController(AppDbContext context, IOpenAiService openAiService)
         {
             _context = context;
@@ -35,7 +35,16 @@ namespace WeProject.Controllers
                 return NotFound();
             }
 
-            return View(chapter);
+            // ViewModel erstellen und befüllen
+            var viewModel = new QuestionIndexViewModel
+            {
+                Chapter = chapter,
+                PdfFileName = !string.IsNullOrEmpty(chapter.PdfFilePath) 
+                    ? Path.GetFileName(new Uri(chapter.PdfFilePath).LocalPath) 
+                    : null
+            };
+
+            return View(viewModel);
         }
 
         // GET: Question/Create?chapterId=X
@@ -160,15 +169,11 @@ namespace WeProject.Controllers
 
             if (question != null)
             {
-                // Liste der Antworttexte für die KI extrahieren
                 var answers = question.AnswerOptions.Select(a => a.Text).ToList();
                 
                 try
                 {
-                    // KI befragen
                     string feedback = await _openAiService.ValidateQuestionAsync(question.Text, answers);
-                    
-                    // Das Feedback an die View übergeben
                     TempData["ValidationResult"] = feedback;
                     TempData["ValidatedQuestionText"] = question.Text;
                 }

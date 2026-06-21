@@ -1,72 +1,68 @@
 using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
-using Microsoft.AspNetCore.Http;
+using WeProject.Services;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Http;
+using System.Threading.Tasks;
 using System;
 using System.IO;
-using System.Threading.Tasks;
 
 namespace WeProject.Services
 {
-    // Das Interface (Der Bauplan für den Service)
-    public interface IPdfStorageService
-    {
-        // Das Fragezeichen macht den String "nullable", also tolerant für leere Rückgaben
-        Task<string?> UploadPdfAsync(IFormFile file);
-        Task DeletePdfAsync(string? fileUrl);
-    }
-
-    // Die eigentliche Logik
     public class PdfStorageService : IPdfStorageService
     {
         private readonly string _connectionString;
-        private readonly string _containerName = "vorlesungsfolien"; 
+        private readonly string _containerName = "pdfs";
 
         public PdfStorageService(IConfiguration configuration)
         {
-            // Das ?? "" verhindert Abstürze, falls der Schlüssel in der appsettings.json noch fehlt
+            // Greift auf den Verbindungsstring zu und stellt sicher, dass er nicht null ist, um die Compiler-Warnung zu beheben.
             _connectionString = configuration.GetConnectionString("AzureBlobStorage") ?? "";
         }
 
-        public async Task<string?> UploadPdfAsync(IFormFile file)
+        public async Task<string> UploadPdfAsync(IFormFile file)
         {
-            if (file == null || file.Length == 0) return null;
+            if (file == null || file.Length == 0)
+            {
+                throw new ArgumentNullException(nameof(file), "Cannot upload a null or empty file.");
+            }
+            
+            if (string.IsNullOrEmpty(_connectionString))
+            {
+                throw new InvalidOperationException("Azure Blob Storage connection string is not configured.");
+            }
 
             var blobServiceClient = new BlobServiceClient(_connectionString);
-            var containerClient = blobServiceClient.GetBlobContainerClient(_containerName);
+            var blobContainerClient = blobServiceClient.GetBlobContainerClient(_containerName);
             
-            await containerClient.CreateIfNotExistsAsync(PublicAccessType.Blob);
+            await blobContainerClient.CreateIfNotExistsAsync();
 
-            string uniqueName = Guid.NewGuid().ToString() + "_" + file.FileName;
-            var blobClient = containerClient.GetBlobClient(uniqueName);
+            // Eindeutigen Namen für das Blob generieren, um Überschreibungen zu vermeiden
+            var uniqueBlobName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+            var blobClient = blobContainerClient.GetBlobClient(uniqueBlobName);
 
-            using (var stream = file.OpenReadStream())
+            await using (var stream = file.OpenReadStream())
             {
-                await blobClient.UploadAsync(stream, new BlobHttpHeaders { ContentType = file.ContentType });
+                await blobClient.UploadAsync(stream, true);
             }
 
             return blobClient.Uri.ToString();
         }
 
-        public async Task DeletePdfAsync(string? fileUrl)
+        public async Task DeletePdfAsync(string blobUrl)
         {
-            if (string.IsNullOrEmpty(fileUrl)) return;
-
-            try
+            if (string.IsNullOrEmpty(_connectionString) || string.IsNullOrEmpty(blobUrl))
             {
-                var uri = new Uri(fileUrl);
-                string blobName = Path.GetFileName(uri.LocalPath);
-
-                var blobServiceClient = new BlobServiceClient(_connectionString);
-                var containerClient = blobServiceClient.GetBlobContainerClient(_containerName);
-                var blobClient = containerClient.GetBlobClient(blobName);
-
-                await blobClient.DeleteIfExistsAsync();
+                return;
             }
-            catch 
-            { 
-                // Fehler abfangen, falls die Datei in der Cloud nicht existiert
-            }
+
+            var blobUri = new Uri(blobUrl);
+            var blobName = Path.GetFileName(blobUri.LocalPath);
+
+            var blobServiceClient = new BlobServiceClient(_connectionString);
+            var blobContainerClient = blobServiceClient.GetBlobContainerClient(_containerName);
+            var blobClient = blobContainerClient.GetBlobClient(blobName);
+
+            await blobClient.DeleteIfExistsAsync();
         }
     }
 }

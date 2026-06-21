@@ -68,5 +68,25 @@ namespace WeProject.Controllers
             TempData["Success"] = $"Prüfung mit {questionCount} Fragen erfolgreich generiert!";
             return RedirectToAction(nameof(Index), new { courseId = courseId });
         }
+
+        // GET: Exam/Print
+        public async Task<IActionResult> Print(int id)
+        {
+            var exam = await _context.Exams
+                .Include(e => e.Course) // Kurs-Infos für den Titel laden
+                .Include(e => e.Questions) // Alle Fragen dieser Prüfung laden
+                    .ThenInclude(q => q.AnswerOptions) // Und zu jeder Frage die Antwortoptionen
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (exam == null)
+            {
+                return NotFound();
+            }
+
+            // Die Fragen für die Druckansicht mischen, damit nicht jeder die gleiche Reihenfolge hat
+            exam.Questions = exam.Questions.OrderBy(q => Guid.NewGuid()).ToList();
+
+            return View(exam);
+        }
     }
 }
