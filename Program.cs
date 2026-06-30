@@ -16,20 +16,75 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // 3. Cloud-Speicher-Dienst registrieren
 builder.Services.AddScoped<IPdfStorageService, PdfStorageService>();
 
-// 4. KI-Schnittstelle registrieren
-builder.Services.AddHttpClient<IOpenAiService, GeminiService>();
+// 4. KI-Schnittstelle (Gemini) mit HttpClientFactory und API-Schlüssel registrieren
+builder.Services.AddHttpClient<IOpenAiService, GeminiService>(client =>
+{
+    client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+    
+    // Liest den API-Schlüssel aus der Konfiguration (appsettings.json oder Azure App Settings)
+    string? geminiApiKey = builder.Configuration["Gemini:ApiKey"];
+    
+    // Fügt den API-Schlüssel als Standard-Header für alle Anfragen dieses Clients hinzu
+    if (!string.IsNullOrEmpty(geminiApiKey))
+    {
+        client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
+    }
+});
 
 // 5. Den PDF-Text-Extraktionsdienst registrieren
 builder.Services.AddScoped<PdfTextExtractionService>();
 
 var app = builder.Build();
 
+// --- Start: Zugang ohne IP-Adresse ---
+app.Use(async (context, next) =>
+{
+    // Geheimes Zugangswort 
+    string secretKey = "prüfungsgenerator-2026"; 
+
+    // 1. Prüfen: Kommt jemand über den speziellen Link?
+    if (context.Request.Query["zugang"] == secretKey)
+    {
+        // Cookie setzen, das 30 Tage hält
+        context.Response.Cookies.Append("ProjectAccess", "Granted", new CookieOptions 
+        { 
+            Expires = DateTimeOffset.UtcNow.AddDays(30),
+            HttpOnly = true,
+            Secure = true, 
+            SameSite = SameSiteMode.Strict
+        });
+
+        // Optional: Weiterleitung auf schöneren Link
+        context.Response.Redirect("/");
+        return;
+    }
+
+    // 2. Prüfen: gültiges Cookie?
+    if (context.Request.Cookies.ContainsKey("ProjectAccess"))
+    {
+        // falls ja
+        await next(); 
+    }
+    else
+    {
+        // 3. Kein Zugang: kein Cookie und falscher Link
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync(@"
+            <div style='font-family: sans-serif; text-align: center; margin-top: 50px;'>
+                <h2>Zugriff geschützt</h2>
+                <p>Bitte nutzen Sie für die Begutachtung den vollständigen Link aus der E-Mail.</p>
+            </div>");
+    }
+});
+// --- ENDE: Zugang ---
+
 // =================================================================
 // DIAGNOSE-BLOCK: Fängt Startfehler ab und gibt sie aus
 // =================================================================
 try
 {
-    // 6. Automatische Datenbank-Initialisierung beim Start
+    // Automatische Datenbank-Initialisierung beim Start
     using (var scope = app.Services.CreateScope())
     {
         var services = scope.ServiceProvider;
@@ -43,7 +98,7 @@ try
         Console.WriteLine("--> Seed Data finished.");
     }
 
-    // 7. HTTP-Pipeline konfigurieren
+    // HTTP-Pipeline konfigurieren
     if (!app.Environment.IsDevelopment())
     {
         app.UseExceptionHandler("/Home/Error");
@@ -55,7 +110,7 @@ try
     app.UseRouting();
     app.UseAuthorization();
 
-    // 8. Standard-Routing festlegen
+    // Standard-Routing festlegen
     app.MapControllerRoute(
         name: "default",
         pattern: "{controller=Home}/{action=Index}/{id?}");

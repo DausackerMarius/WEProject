@@ -23,16 +23,29 @@
     }
 
     <div class="row mb-5">
-        
-        <div class="col-md-6">
+        <div class="col-md-8">
             <div class="card shadow-sm border-0 h-100 bg-light">
-                <div class="card-body">
-                    <h5 class="card-title">Neue Prüfung erstellen</h5>
-                    <form asp-action="Generate" method="post" class="d-flex align-items-center gap-3 mt-3">
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-3">Neue Prüfung erstellen</h5>
+                    <form asp-action="Generate" method="post">
                         <input type="hidden" name="courseId" value="@Model.Id" />
-                        <label for="questionCount" class="fw-bold mb-0">Anzahl Fragen:</label>
-                        <input type="number" id="questionCount" name="questionCount" class="form-control w-25" min="1" value="10" required />
-                        <button type="submit" class="btn btn-warning fw-bold shadow-sm">Prüfung generieren</button>
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-3">
+                                <label for="examDate" class="form-label fw-bold">Datum</label>
+                                <input type="date" id="examDate" name="examDate" class="form-control" value="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")" required />
+                            </div>
+                            <div class="col-md-3">
+                                <label for="examTime" class="form-label fw-bold">Uhrzeit</label>
+                                <input type="time" id="examTime" name="examTime" class="form-control" value="10:00" required />
+                            </div>
+                            <div class="col-md-3">
+                                <label for="questionCount" class="form-label fw-bold">Anzahl Fragen</label>
+                                <input type="number" id="questionCount" name="questionCount" class="form-control" min="1" value="10" required />
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-warning fw-bold shadow-sm w-100">Prüfung generieren</button>
+                            </div>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -96,7 +109,7 @@
                             <div class="d-grid gap-2">
                                 <a asp-action="Print" asp-route-id="@exam.Id" target="_blank" class="btn btn-outline-primary fw-bold">Druckansicht öffnen</a>
                                 
-                                <!-- NEUER LÖSCHEN-BUTTON -->
+                                <!-- LÖSCHEN-BUTTON -->
                                 <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#deleteConfirmationModal"

@@ -5,6 +5,7 @@ using WeProject.Models;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Globalization;
 
 namespace WeProject.Controllers
 {
@@ -17,7 +18,6 @@ namespace WeProject.Controllers
             _context = context;
         }
 
-        // GET: Lädt die Liste aller Prüfungen eines Kurses
         public async Task<IActionResult> Index(int courseId)
         {
             var course = await _context.Courses
@@ -30,12 +30,10 @@ namespace WeProject.Controllers
             return View(course);
         }
 
-        // POST: Der 1,0-Algorithmus zur Prüfungsgenerierung
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Generate(int courseId, int questionCount)
+        public async Task<IActionResult> Generate(int courseId, int questionCount, DateOnly examDate, TimeOnly examTime)
         {
-            // Wir laden den Kurs mit ALLEN Kapiteln und ALLEN darin enthaltenen Fragen
             var course = await _context.Courses
                 .Include(c => c.Chapters)
                     .ThenInclude(ch => ch.Questions)
@@ -43,7 +41,6 @@ namespace WeProject.Controllers
 
             if (course == null) return NotFound();
 
-            // Alle Fragen aus allen Kapiteln in eine flache Liste packen
             var allQuestions = course.Chapters.SelectMany(ch => ch.Questions).ToList();
 
             if (allQuestions.Count < questionCount)
@@ -52,30 +49,31 @@ namespace WeProject.Controllers
                 return RedirectToAction(nameof(Index), new { courseId = courseId });
             }
 
-            // Zufällige Auswahl von n Fragen ohne Dubletten (Guid-Sortierung ist ein extrem effizienter Shuffle-Trick)
             var randomQuestions = allQuestions.OrderBy(q => Guid.NewGuid()).Take(questionCount).ToList();
+
+            // Kombinieren von Datum und Uhrzeit zu einem einzigen DateTime-Objekt
+            var examDateTime = examDate.ToDateTime(examTime);
 
             var newExam = new Exam
             {
                 CourseId = courseId,
-                ExamDate = DateTime.Now,
+                ExamDate = examDateTime, // Das neue, festgelegte Datum verwenden
                 Questions = randomQuestions
             };
 
             _context.Exams.Add(newExam);
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = $"Prüfung mit {questionCount} Fragen erfolgreich generiert!";
+            TempData["Success"] = $"Prüfung für den {examDateTime:dd.MM.yyyy 'um' HH:mm 'Uhr'} mit {questionCount} Fragen erfolgreich generiert!";
             return RedirectToAction(nameof(Index), new { courseId = courseId });
         }
 
-        // GET: Exam/Print
         public async Task<IActionResult> Print(int id)
         {
             var exam = await _context.Exams
-                .Include(e => e.Course) // Kurs-Infos für den Titel laden
-                .Include(e => e.Questions) // Alle Fragen dieser Prüfung laden
-                    .ThenInclude(q => q.AnswerOptions) // Und zu jeder Frage die Antwortoptionen
+                .Include(e => e.Course)
+                .Include(e => e.Questions)
+                    .ThenInclude(q => q.AnswerOptions)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (exam == null)
@@ -83,7 +81,6 @@ namespace WeProject.Controllers
                 return NotFound();
             }
 
-            // Die Fragen für die Druckansicht mischen, damit nicht jeder die gleiche Reihenfolge hat
             exam.Questions = exam.Questions.OrderBy(q => Guid.NewGuid()).ToList();
 
             return View(exam);
