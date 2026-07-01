@@ -1,0 +1,97 @@
+@model WeProject.Models.Course
+
+@{
+    ViewData["Title"] = "Kapitel - " + (Model?.Title ?? "Unbekannt");
+}
+
+<div class="container mt-4">
+    <div class="card mb-4 shadow-sm border-0 bg-light">
+        <div class="card-body">
+            <h2 class="card-title h4 text-primary mb-3">@Model?.Title</h2>
+            <div class="row text-muted">
+                <div class="col-md-6">
+                    <strong>Dozent:</strong> @Model?.LecturerName
+                </div>
+                <div class="col-md-6">
+                    <strong>Typ:</strong> @(Model?.IsMasterCourse == true ? "Master" : "Bachelor")
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Kapitelübersicht</h3>
+        <div>
+            <a asp-controller="Course" asp-action="Index" class="btn btn-outline-secondary me-2">Zurück zur Kursliste</a>
+            <a asp-action="Create" asp-route-courseId="@Model?.Id" class="btn btn-success fw-bold shadow-sm">Neues Kapitel anlegen</a>
+        </div>
+    </div>
+
+    <table class="table table-hover table-bordered shadow-sm bg-white">
+        <thead class="table-dark">
+            <tr>
+                <th style="width: 8%;">Nr.</th>
+                <th>Titel</th>
+                <th>Vorlesungsmaterial</th>
+                <th>Fragenkatalog</th>
+                <th style="width: 22%;">Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model?.Chapters != null && Model.Chapters.Any())
+            {
+                @foreach (var chapter in Model.Chapters)
+                {
+                    <tr>
+                        <td class="align-middle">@chapter.ChapterNumber</td>
+                        <td class="align-middle"><strong>@chapter.Title</strong></td>
+                        <td class="align-middle">
+                            @if (!string.IsNullOrEmpty(chapter.PdfFilePath))
+                            {
+                                <a href="@chapter.PdfFilePath" target="_blank" class="btn btn-sm btn-outline-info">PDF ansehen</a>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">Keine Datei vorhanden</span>
+                            }
+                        </td>
+                        <td class="align-middle">
+                            <a asp-controller="Question" asp-action="Index" asp-route-chapterId="@chapter.Id" class="btn btn-primary position-relative btn-sm">
+                                Fragen
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                    @(chapter.Questions?.Count ?? 0)
+                                </span>
+                            </a>
+                        </td>
+                        <td class="align-middle">
+                            <div class="d-flex gap-2">
+                                <a asp-action="Edit" asp-route-id="@chapter.Id" class="btn btn-sm btn-outline-secondary">Bearbeiten</a>
+                                <!-- NEUER LÖSCHEN-BUTTON -->
+                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteConfirmationModal"
+                                        data-delete-url="@Url.Action("Delete", "Chapter", new { id = chapter.Id })"
+                                        data-delete-main-text="Möchten Sie dieses Kapitel wirklich löschen?"
+                                        data-delete-item-name="@chapter.Title"
+                                        data-delete-item-line1="Nummer: @chapter.ChapterNumber"
+                                        data-delete-item-line2="Kurs: @(Model?.Title ?? "Unbekannt")"
+                                        data-delete-warning-text="Dieser Vorgang kann nicht rückgängig gemacht werden. Alle zugehörigen Fragen werden ebenfalls gelöscht.">
+                                    Löschen
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">Keine Kapitel vorhanden.</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Das Modal am Ende der Seite einbinden -->
+<partial name="_DeleteConfirmation" />

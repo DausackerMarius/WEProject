@@ -1,0 +1,167 @@
+@model WeProject.Models.QuestionIndexViewModel
+@{
+    ViewData["Title"] = "Prüfungsfragen";
+}
+
+<div class="container mt-5">
+    
+    <a asp-controller="Chapter" asp-action="Index" asp-route-courseId="@Model.Chapter.CourseId" class="btn btn-outline-secondary mb-4">← Zurück zur Kapitelübersicht</a>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Prüfungsfragen: @Model.Chapter.Title</h2>
+        <div>
+            <a asp-controller="Question" asp-action="Create" asp-route-chapterId="@Model.Chapter.Id" class="btn btn-success me-2 fw-bold shadow-sm">Frage manuell anlegen</a>
+            
+            <button type="button" class="btn btn-warning fw-bold text-dark shadow-sm" data-bs-toggle="modal" data-bs-target="#kiGeneratorModal">
+                Neue Fragen per KI generieren
+            </button>
+        </div>
+    </div>
+
+    @if (Model.Chapter.Questions != null && Model.Chapter.Questions.Any())
+    {
+        @foreach (var question in Model.Chapter.Questions)
+        {
+            <div class="card mb-4 shadow-sm border-secondary">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-3">@question.Text</h5>
+                    <ul class="list-group list-group-flush mb-3">
+                        @if (question.AnswerOptions != null)
+                        {
+                            @foreach (var option in question.AnswerOptions)
+                            {
+                                string badgeClass = option.IsCorrect ? "bg-success" : "bg-secondary";
+                                string badgeText = option.IsCorrect ? "Korrekt" : "Falsch";
+                                string textClass = option.IsCorrect ? "fw-bold text-success" : "text-muted";
+
+                                <li class="list-group-item d-flex align-items-center">
+                                    <span class="badge @badgeClass me-3 p-2" style="width: 70px; text-align: center;">@badgeText</span>
+                                    <span class="@textClass">@option.Text</span>
+                                </li>
+                            }
+                        }
+                    </ul>
+                    
+                    <div class="d-flex justify-content-end align-items-center">
+                        <form asp-controller="Question" asp-action="ValidateQuestion" method="post" class="m-0 p-0 me-2">
+                            <input type="hidden" name="questionId" value="@question.Id" />
+                            <input type="hidden" name="chapterId" value="@Model.Chapter.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-info fw-bold">🤖 Durch KI prüfen lassen</button>
+                        </form>
+                        
+                        <a asp-controller="Question" asp-action="Edit" asp-route-id="@question.Id" class="btn btn-sm btn-outline-primary me-2">Bearbeiten</a>
+                        
+                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#deleteConfirmationModal"
+                                data-delete-url="@Url.Action("Delete", "Question", new { id = question.Id })"
+                                data-delete-main-text="Möchten Sie diese Frage wirklich löschen?"
+                                data-delete-item-name="@question.Text"
+                                data-delete-warning-text="Dieser Vorgang kann nicht rückgängig gemacht werden.">
+                            Löschen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="alert alert-info text-center p-4 shadow-sm">
+            <p class="mb-2">Noch keine Prüfungsfragen für dieses Kapitel vorhanden.</p>
+            <small class="text-muted">Klicke oben rechts auf <strong>"Neue Fragen per KI generieren"</strong>, um deinen Klausur-Pool zu füllen!</small>
+        </div>
+    }
+</div>
+
+<!-- Modal für KI-Generator -->
+<div class="modal fade" id="kiGeneratorModal" tabindex="-1" aria-labelledby="kiGeneratorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-warning">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold" id="kiGeneratorModalLabel">✨ KI-Fragen für den Klausur-Pool</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                
+                @if (!string.IsNullOrEmpty(Model.Chapter.PdfFilePath))
+                {
+                    <div class="mb-3 text-center">
+                        <p class="fw-bold">Option 1: Vorhandenes PDF verwenden</p>
+                        <form asp-controller="Generator" asp-action="GenerateFromExisting" method="post">
+                            <input type="hidden" name="chapterId" value="@Model.Chapter.Id" />
+                            <div class="input-group mb-3 mx-auto" style="max-width: 300px;">
+                                <label class="input-group-text" for="questionCountExisting">Anzahl Fragen</label>
+                                <input type="number" id="questionCountExisting" name="questionCount" class="form-control" value="5" min="1" max="10" required />
+                            </div>
+                            <button type="submit" class="btn btn-primary fw-bold w-100">
+                                <i class="bi bi-file-earmark-check-fill"></i> Fragen aus "@Model.PdfFileName" generieren
+                            </button>
+                        </form>
+                    </div>
+                    <hr />
+                    <p class="text-center text-muted small my-2">ODER</p>
+                }
+
+                <form asp-controller="Generator" asp-action="GenerateForChapter" method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="chapterId" value="@Model.Chapter.Id" />
+                    <p class="fw-bold text-center @(string.IsNullOrEmpty(Model.Chapter.PdfFilePath) ? "" : "mt-3")">
+                        @(string.IsNullOrEmpty(Model.Chapter.PdfFilePath) ? "PDF zur Analyse hochladen" : "Option 2: Neues PDF hochladen")
+                    </p>
+                    <div class="mb-3">
+                        <label for="pdfFile" class="form-label">Vorlesungs-PDF:</label>
+                        <input type="file" name="pdfFile" id="pdfFile" class="form-control" accept=".pdf" required />
+                    </div>
+                    <div class="mb-3">
+                        <label for="questionCountNew" class="form-label">Wie viele Fragen sollen generiert werden?</label>
+                        <input type="number" id="questionCountNew" name="questionCount" class="form-control" value="5" min="1" max="10" required />
+                    </div>
+                    <div class="modal-footer bg-light p-2 mt-3">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="submit" class="btn btn-warning fw-bold text-dark">Zur Vorschau generieren</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Das Modal für die Lösch-Bestätigung -->
+<partial name="_DeleteConfirmation" />
+
+@section Scripts {
+    <script>
+        // Logik, um das 'required' Attribut beim Upload zu deaktivieren, wenn das andere Formular abgeschickt wird.
+        // Dies verhindert einen Validierungsfehler, wenn man das vorhandene PDF nutzen möchte.
+        document.addEventListener('DOMContentLoaded', function() {
+            const kiModal = document.getElementById('kiGeneratorModal');
+            if(kiModal) {
+                const existingForm = kiModal.querySelector('form[asp-action="GenerateFromExisting"]');
+                const newForm = kiModal.querySelector('form[asp-action="GenerateForChapter"]');
+                const fileInput = newForm.querySelector('input[type="file"]');
+
+                if(existingForm) {
+                    existingForm.addEventListener('submit', function() {
+                        fileInput.removeAttribute('required');
+                    });
+                }
+            }
+        });
+    </script>
+}

@@ -1,0 +1,51 @@
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+# ASP.NET Core & .NET spezifische Ignorierungen
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
+# Kompilierte Ausgaben (Build-Ordner)
+bin/
+obj/
+
+# Lokale Verzeichnisse von Visual Studio und VS Code
+.vs/
+.vscode/
+.ionide/
+
+# Lokale Konfigurationsdatei für Entwicklungs-Geheimnisse (OpenAI Key!)
+appsettings.Development.json
+
+# Falls ihr .NET User Secrets verwendet
+/.microsoft.dotnet.secretmanager/secrets.json
+~/.microsoft/usersecrets/
+
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+# Datenbanken (SQLite & Lokale Files)
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
+# Ignoriert die SQLite-Datenbankdatei selbst
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+# Betriebssystem- & Tool-Spezifisches
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
+# Windows-Spezifisch
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Mac-Spezifisch
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Lokaler Azurite Cloud-Emulator Speicherplatz
+__blobstorage__/
+__queuestorage__/
+__table0target__
+azurite_db_*.json

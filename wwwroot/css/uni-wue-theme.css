@@ -1,0 +1,91 @@
+﻿/*
+    UNI WÜRZBURG - CORPORATE DESIGN THEME
+    --------------------------------------
+    Diese Datei überschreibt die Standard-Farben von Bootstrap 5
+    mit den offiziellen Farben der Julius-Maximilians-Universität Würzburg.
+*/
+
+:root {
+    /* Hauptfarben der Uni Würzburg aus den stuv CI Guidelines */
+    --uni-wue-blue: #364f78;
+    --uni-wue-light-blue: #a6bad9;
+    --uni-wue-grey: #738393;
+
+    /* Überschreiben der Bootstrap-Standardvariablen */
+    
+    /* Primärfarbe (für Buttons, Links, wichtige Elemente) */
+    --bs-primary: var(--uni-wue-blue);
+    --bs-primary-rgb: 54, 79, 120;
+
+    /* Sekundärfarbe (für weniger wichtige Buttons, Hintergründe) */
+    --bs-secondary: var(--uni-wue-grey);
+    --bs-secondary-rgb: 115, 131, 147;
+
+    /* Success-Farbe (grün) wird zu Hellblau */
+    --bs-success: var(--uni-wue-light-blue);
+    --bs-success-rgb: 166, 186, 217;
+
+    /* Warning-Farbe (gelb) wird ebenfalls zu Hellblau */
+    --bs-warning: var(--uni-wue-light-blue);
+    --bs-warning-rgb: 166, 186, 217;
+
+    /* Info-Farbe (bisher hellblau) wird zu Grau für Einheitlichkeit */
+    --bs-info: var(--uni-wue-grey);
+    --bs-info-rgb: 115, 131, 147;
+
+    /* Text- und Linkfarben anpassen */
+    --bs-link-color: var(--uni-wue-blue);
+    --bs-link-hover-color: #2a3b59; /* Eine abgedunkelte Version des Blaus */
+}
+
+/*
+  Zusätzliche Anpassungen, um das Farbschema konsistent anzuwenden.
+  Wir stellen sicher, dass auch Outline-Buttons und Textfarben das neue Schema nutzen.
+*/
+
+/* Primär-Buttons (Dunkelblau) */
+.btn-primary {
+    --bs-btn-bg: var(--bs-primary);
+    --bs-btn-border-color: var(--bs-primary);
+    --bs-btn-color: #ffffff;
+    --bs-btn-hover-bg: #2a3b59;
+    --bs-btn-hover-border-color: #2a3b59;
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--bs-primary);
+    --bs-btn-border-color: var(--bs-primary);
+    --bs-btn-hover-bg: var(--bs-primary);
+    --bs-btn-hover-color: #ffffff;
+}
+
+/* Success-Buttons */
+.btn-success {
+    --bs-btn-bg: var(--bs-success);
+    --bs-btn-border-color: var(--bs-success);
+    --bs-btn-color: #000000; /* Dunkler Text für besseren Kontrast auf Hellblau */
+    --bs-btn-hover-bg: #90a5c8;
+    --bs-btn-hover-border-color: #90a5c8;
+}
+
+/* Warning-Buttons */
+.btn-warning {
+    --bs-btn-bg: var(--bs-warning);
+    --bs-btn-border-color: var(--bs-warning);
+    --bs-btn-color: #000000; /* Dunkler Text für besseren Kontrast auf Hellblau */
+    --bs-btn-hover-bg: #90a5c8;
+    --bs-btn-hover-border-color: #90a5c8;
+}
+
+/* Info-Badge */
+.bg-info {
+    background-color: var(--bs-info) !important;
+}
+
+.text-primary {
+    color: var(--bs-primary) !important;
+}
+
+.bg-primary {
+    background-color: var(--bs-primary) !important;
+}

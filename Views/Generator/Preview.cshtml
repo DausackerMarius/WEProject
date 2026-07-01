@@ -1,0 +1,65 @@
+@model WeProject.Controllers.PreviewViewModel
+@{
+    ViewData["Title"] = "KI-Fragen Vorschau";
+}
+
+<div class="container mt-5">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>🧐 KI-Fragen überprüfen</h2>
+            <p class="text-muted">Wähle aus, welche der generierten Fragen du in deinen Klausur-Pool übernehmen möchtest.</p>
+        </div>
+        <div>
+            <span class="badge bg-warning text-dark fs-6 p-2 shadow-sm">Dozenten-Vorschau</span>
+        </div>
+    </div>
+
+    <form asp-controller="Generator" asp-action="SaveSelectedQuestions" method="post">
+        
+        <input type="hidden" name="chapterId" value="@Model.ChapterId" />
+
+        @for (int i = 0; i < Model.Questions.Count; i++)
+        {
+            var q = Model.Questions[i];
+
+            <div class="card mb-4 shadow-sm border-primary">
+                
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <div class="form-check form-switch fs-5">
+                        <input class="form-check-input" type="checkbox" role="switch" name="selectedIndices" value="@i" id="check_@i" checked>
+                        <label class="form-check-label fw-bold ms-2 mt-1" for="check_@i" style="cursor:pointer;">Frage @(i+1) in den Pool aufnehmen</label>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-3">@q.Frage</h5>
+
+                    <input type="hidden" name="questions[@i].Frage" value="@q.Frage" />
+                    <input type="hidden" name="questions[@i].KorrekteAntwortIndex" value="@q.KorrekteAntwortIndex" />
+
+                    <ul class="list-group list-group-flush">
+                        @for (int j = 0; j < q.Antworten.Count; j++)
+                        {
+                            bool isCorrect = (j == q.KorrekteAntwortIndex);
+                            string textClass = isCorrect ? "text-success fw-bold bg-light" : "";
+
+                            <li class="list-group-item @textClass">
+                                <span class="me-2 text-muted">@((char)('A' + j))</span> @q.Antworten[j]
+                                @if (isCorrect) { <span class="badge bg-success float-end mt-1">Korrekt</span> }
+                            </li>
+
+                            <input type="hidden" name="questions[@i].Antworten[@j]" value="@q.Antworten[j]" />
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+
+        <div class="d-flex justify-content-between p-3 bg-light rounded border mb-5">
+            <a href="/Question?chapterId=@Model.ChapterId" class="btn btn-outline-secondary">Abbrechen & Verwerfen</a>
+            <button type="submit" class="btn btn-success fw-bold px-4">✔ Ausgewählte Fragen speichern</button>
+        </div>
+        
+    </form>
+</div>

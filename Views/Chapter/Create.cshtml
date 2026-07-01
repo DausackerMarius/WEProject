@@ -1,0 +1,45 @@
+@model WeProject.Models.Chapter
+
+@{
+    ViewData["Title"] = "Neues Kapitel";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0">Neues Kapitel anlegen</h3>
+                </div>
+                <div class="card-body bg-light">
+                    <form asp-action="Create" enctype="multipart/form-data">
+                        <input type="hidden" asp-for="CourseId" value="@ViewBag.CourseId" />
+
+                        @* Das Feld für die Kapitelnummer wurde entfernt, da diese jetzt automatisch vergeben wird. *@
+
+                        <div class="mb-4">
+                            <label asp-for="Title" class="form-label fw-bold">Titel des Kapitels</label>
+                            <input asp-for="Title" class="form-control" placeholder="z. B. Einführung in ASP.NET" required />
+                            <span asp-validation-for="Title" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-4 p-3 border rounded bg-white shadow-sm">
+                            <label class="form-label fw-bold text-primary">Vorlesungsmaterial (PDF) - Optional</label>
+                            <input type="file" class="form-control" name="uploadedPdf" accept=".pdf" />
+                            <div class="form-text">Sie können das PDF auch später im Bearbeitungsmodus hochladen.</div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" asp-route-courseId="@ViewBag.CourseId" class="btn btn-outline-secondary">Abbrechen</a>
+                            <button type="submit" class="btn btn-success px-4">Speichern</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

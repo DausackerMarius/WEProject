@@ -1,0 +1,75 @@
+@model WeProject.Models.Exam
+@{
+    Layout = null; 
+}
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <title>Klausur - @Model.Course?.Title</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        @@media print {
+            .no-print { display: none !important; }
+            body { background-color: #fff; }
+        }
+        body { background-color: #f8f9fa; }
+        .exam-paper { background: white; max-width: 900px; margin: 0 auto; padding: 50px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .question-block { page-break-inside: avoid; }
+        .circle { display: inline-block; width: 18px; height: 18px; border: 2px solid #000; border-radius: 50%; margin-right: 15px; vertical-align: text-bottom; }
+    </style>
+</head>
+<body class="p-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print" style="max-width: 900px; margin: 0 auto;">
+        <button onclick="window.print()" class="btn btn-primary shadow-sm">🖨️ Klausur drucken (als PDF speichern)</button>
+        <button onclick="window.close()" class="btn btn-outline-secondary bg-white shadow-sm">Fenster schließen</button>
+    </div>
+
+    <div class="exam-paper border">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Prüfung: @Model.Course?.Title</h2>
+            <p class="text-muted">Erstellt am @Model.ExamDate.ToString("dd.MM.yyyy")</p>
+            <hr class="border-2 border-dark my-4" />
+            
+            <div class="d-flex justify-content-between text-start mt-4 px-3">
+                <h5 class="fw-bold">Name: ____________________________</h5>
+                <h5 class="fw-bold">Matrikelnummer: ______________</h5>
+            </div>
+            <div class="text-start mt-4 px-3">
+                <h5 class="fw-bold">Unterschrift: _______________________</h5>
+            </div>
+        </div>
+
+        @if (Model.Questions != null && Model.Questions.Any())
+        {
+            var questionList = Model.Questions.ToList();
+            for (int i = 0; i < questionList.Count; i++)
+            {
+                var q = questionList[i];
+                <div class="question-block mb-5 px-3">
+                    <h5 class="fw-bold mb-3">Frage @(i+1): @q.Text</h5>
+                    
+                    <ul class="list-unstyled ms-3">
+                        @if (q.AnswerOptions != null)
+                        {
+                            foreach (var ans in q.AnswerOptions)
+                            {
+                                <li class="mb-3 fs-5">
+                                    <span class="circle"></span> @ans.Text
+                                </li>
+                            }
+                        }
+                    </ul>
+                </div>
+            }
+        }
+        
+        <div class="text-center text-muted mt-5" style="font-size: 0.8rem;">
+            Ende der Prüfung. Viel Erfolg!
+        </div>
+    </div>
+
+</body>
+</html>

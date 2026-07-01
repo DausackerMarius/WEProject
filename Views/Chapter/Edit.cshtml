@@ -1,0 +1,66 @@
+@model WeProject.Models.Chapter
+
+@{
+    ViewData["Title"] = "Kapitel bearbeiten";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-warning text-dark">
+                    <h3 class="mb-0">Kapitel bearbeiten</h3>
+                </div>
+                <div class="card-body bg-light">
+                    <form asp-action="Edit" enctype="multipart/form-data">
+                        <input type="hidden" asp-for="Id" />
+                        <input type="hidden" asp-for="CourseId" />
+
+                        <div class="mb-3">
+                            <label asp-for="ChapterNumber" class="form-label fw-bold">Kapitelnummer</label>
+                            <input asp-for="ChapterNumber" class="form-control" type="number" min="1" required />
+                            <span asp-validation-for="ChapterNumber" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="Title" class="form-label fw-bold">Titel des Kapitels</label>
+                            <input asp-for="Title" class="form-control" required />
+                            <span asp-validation-for="Title" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-4 p-3 border rounded bg-white shadow-sm">
+                            <label class="form-label fw-bold text-primary">Vorlesungsmaterial (PDF) - Optional</label>
+                            
+                            @if (!string.IsNullOrEmpty(Model.PdfFilePath))
+                            {
+                                <div class="alert alert-info mb-3">
+                                    <strong>Aktuelle Datei:</strong> 
+                                    <a href="@Model.PdfFilePath" target="_blank" class="alert-link">PDF herunterladen</a>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="deleteFile" id="deleteFile" />
+                                    <label class="form-check-label text-danger" for="deleteFile">
+                                        PDF löschen
+                                    </label>
+                                </div>
+                            }
+                            
+                            <label class="form-label">Neue Datei hochladen (ersetzt ggf. die bestehende):</label>
+                            <input type="file" class="form-control" name="uploadedPdf" accept=".pdf" />
+                            <div class="form-text">Optional: Sie können ein PDF hochladen oder die aktuelle Datei durch Löschen entfernen.</div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" asp-route-courseId="@Model.CourseId" class="btn btn-outline-secondary">Abbrechen</a>
+                            <button type="submit" class="btn btn-warning px-4 fw-bold">Änderungen speichern</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

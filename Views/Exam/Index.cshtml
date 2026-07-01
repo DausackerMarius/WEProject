@@ -1,0 +1,139 @@
+@model WeProject.Models.Course
+
+@{
+    ViewData["Title"] = "Prüfungen - " + Model.Title;
+}
+
+<div class="container mt-4">
+    <div class="mb-4">
+        <a asp-controller="Course" asp-action="Index" class="btn btn-outline-secondary">
+            &larr; Zurück zur Kursliste
+        </a>
+    </div>
+
+    <h2 class="mb-4">Prüfungsverwaltung: @Model.Title</h2>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+
+    <div class="row mb-5">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0 h-100 bg-light">
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-3">Neue Prüfung erstellen</h5>
+                    <form asp-action="Generate" method="post">
+                        <input type="hidden" name="courseId" value="@Model.Id" />
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-3">
+                                <label for="examDate" class="form-label fw-bold">Datum</label>
+                                <input type="date" id="examDate" name="examDate" class="form-control" value="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")" required />
+                            </div>
+                            <div class="col-md-3">
+                                <label for="examTime" class="form-label fw-bold">Uhrzeit</label>
+                                <input type="time" id="examTime" name="examTime" class="form-control" value="10:00" required />
+                            </div>
+                            <div class="col-md-3">
+                                <label for="questionCount" class="form-label fw-bold">Anzahl Fragen</label>
+                                <input type="number" id="questionCount" name="questionCount" class="form-control" min="1" value="10" required />
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-warning fw-bold shadow-sm w-100">Prüfung generieren</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100 bg-light">
+                <div class="card-body">
+                    <h5 class="card-title">✨ KI-Fragen aus PDF generieren</h5>
+                    <p class="text-muted small mt-2 mb-3">Lade ein Vorlesungs-PDF hoch, um automatisch neue Fragen für diese Veranstaltung zu erzeugen.</p>
+                    <button type="button" class="btn btn-warning font-weight-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#kiUploadModal">
+                        PDF hochladen & Fragen generieren
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="kiUploadModal" tabindex="-1" aria-labelledby="kiUploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="kiUploadModalLabel">✨ KI-Fragen aus PDF generieren</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form asp-controller="Generator" asp-action="GenerateForChapter" method="post" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <input type="hidden" name="chapterId" value="@Model.Id" />
+                        
+                        <div class="mb-3">
+                            <label for="pdfFile" class="form-label">Wähle das Vorlesungs-PDF aus:</label>
+                            <input type="file" name="pdfFile" class="form-control" accept=".pdf" required />
+                        </div>
+                        <p class="text-muted small">Die KI liest das Dokument aus und erstellt automatisch 3 Multiple-Choice-Fragen.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="submit" class="btn btn-warning">Generieren starten</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <h3>Gespeicherte Prüfungen</h3>
+    <div class="row mt-3">
+        @if (Model.Exams != null && Model.Exams.Any())
+        {
+            @foreach (var exam in Model.Exams.OrderByDescending(e => e.ExamDate))
+            {
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow-sm border-primary h-100">
+                        <div class="card-body text-center d-flex flex-column justify-content-between">
+                            <div>
+                                <h5 class="card-title text-primary">Prüfung vom @exam.ExamDate.ToString("dd.MM.yyyy")</h5>
+                                <p class="card-text text-muted">@exam.ExamDate.ToString("HH:mm") Uhr</p>
+                                <div class="display-6 fw-bold mb-3">
+                                    @(exam.Questions != null ? exam.Questions.Count : 0) <span class="fs-5 fw-normal text-muted">Fragen</span>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <a asp-action="Print" asp-route-id="@exam.Id" target="_blank" class="btn btn-outline-primary fw-bold">Druckansicht öffnen</a>
+                                
+                                <!-- LÖSCHEN-BUTTON -->
+                                <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteConfirmationModal"
+                                        data-delete-url="@Url.Action("Delete", "Exam", new { id = exam.Id })"
+                                        data-delete-main-text="Möchten Sie diese Prüfung wirklich löschen?"
+                                        data-delete-item-name="Prüfung vom @exam.ExamDate.ToString("dd.MM.yyyy")"
+                                        data-delete-item-line1="@((exam.Questions != null ? exam.Questions.Count : 0) + " Fragen")"
+                                        data-delete-warning-text="Dieser Vorgang kann nicht rückgängig gemacht werden.">
+                                    Prüfung verwerfen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="col-12">
+                <div class="alert alert-secondary">Bisher wurden keine Prüfungen für diese Veranstaltung generiert.</div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Das Modal am Ende der Seite einbinden -->
+<partial name="_DeleteConfirmation" />
