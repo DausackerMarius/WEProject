@@ -17,6 +17,8 @@
 
                         @* Das Feld für die Kapitelnummer wurde entfernt, da diese jetzt automatisch vergeben wird. *@
 
+                        <div asp-validation-summary="All" class="text-danger fw-bold mb-3 p-2 border border-danger rounded bg-white"></div>
+
                         <div class="mb-4">
                             <label asp-for="Title" class="form-label fw-bold">Titel des Kapitels</label>
                             <input asp-for="Title" class="form-control" placeholder="z. B. Einführung in ASP.NET" required />
