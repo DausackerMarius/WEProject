@@ -230,6 +230,39 @@ namespace WeProject.Controllers
 
             return RedirectToAction("Index", "Question", new { chapterId = chapterId });
         }
+
+        // =====================================================
+        // NEUE ACTION: Unsichtbarer Endpunkt für den KI-Titel-Button
+        // =====================================================
+        [HttpPost]
+        public async Task<IActionResult> SuggestTitle(IFormFile pdfFile)
+        {
+            if (pdfFile == null || pdfFile.Length == 0) 
+                return Json(new { success = false, message = "Kein PDF ausgewählt." });
+
+            string tempPath = Path.GetTempFileName();
+            try
+            {
+                using (var stream = new FileStream(tempPath, FileMode.Create))
+                {
+                    await pdfFile.CopyToAsync(stream);
+                }
+
+                // Text extrahieren & KI fragen
+                string extractedText = _pdfExtractionService.ExtractTextFromPdf(tempPath);
+                string suggestedTitle = await _openAiService.GenerateTitleFromTextAsync(extractedText);
+
+                return Json(new { success = true, title = suggestedTitle });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+            finally
+            {
+                if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath);
+            }
+        }
     }
 
     // Hilfsklassen

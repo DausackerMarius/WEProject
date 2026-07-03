@@ -52,7 +52,7 @@ namespace WeProject.Services
             return generatedText.Replace("```json", "").Replace("```", "").Trim();
         }
 
-        // 2. NEU: Die Methode zum Validieren (Prüfen)
+        // 2. Die Methode zum Validieren (Prüfen)
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
@@ -80,6 +80,34 @@ namespace WeProject.Services
             using var doc = JsonDocument.Parse(responseString);
             
             return doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? "Kein Feedback erhalten.";
+        }
+
+        // 3. NEU: Methode zum Generieren eines Kapitel-Titels
+        public async Task<string> GenerateTitleFromTextAsync(string documentText)
+        {
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            
+            string promptText = $@"Du bist ein präziser Assistent für Universitätsprofessoren. 
+            Analysiere den folgenden Text eines Vorlesungs-Skripts und generiere einen passenden, extrem kurzen Titel (maximal 3 bis 6 Wörter) für dieses Kapitel. 
+            Antworte AUSSCHLIESSLICH mit dem Titel, ohne Anführungszeichen, ohne Markdown und ohne Erklärungen.
+            
+            Text: {documentText}";
+
+            var requestBody = new
+            {
+                contents = new[] { new { parts = new[] { new { text = promptText } } } }
+            };
+
+            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync(url, content);
+            
+            if (!response.IsSuccessStatusCode) return "";
+
+            var responseString = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(responseString);
+            
+            var generatedTitle = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? "";
+            return generatedTitle.Trim();
         }
     }
 }

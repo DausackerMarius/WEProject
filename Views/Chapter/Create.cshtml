@@ -15,25 +15,28 @@
                     <form asp-action="Create" enctype="multipart/form-data">
                         <input type="hidden" asp-for="CourseId" value="@ViewBag.CourseId" />
 
-                        @* Das Feld für die Kapitelnummer wurde entfernt, da diese jetzt automatisch vergeben wird. *@
-
                         <div asp-validation-summary="All" class="text-danger fw-bold mb-3 p-2 border border-danger rounded bg-white"></div>
+
+                        <div class="mb-4 p-3 border rounded bg-white shadow-sm">
+                            <label class="form-label fw-bold text-primary">Vorlesungsmaterial (PDF)</label>
+                            <input type="file" id="pdfFileInput" class="form-control" name="uploadedPdf" accept=".pdf" />
+                            <div class="form-text">Lade zuerst das PDF hoch, um den Titel per KI generieren zu lassen!</div>
+                        </div>
 
                         <div class="mb-4">
                             <label asp-for="Title" class="form-label fw-bold">Titel des Kapitels</label>
-                            <input asp-for="Title" class="form-control" placeholder="z. B. Einführung in ASP.NET" required />
+                            <div class="input-group">
+                                <input asp-for="Title" id="chapterTitleInput" class="form-control" placeholder="z. B. Einführung in ASP.NET" required />
+                                <button type="button" class="btn btn-outline-warning fw-bold text-dark" id="btnSuggestTitle">
+                                    ✨ Titel per KI generieren
+                                </button>
+                            </div>
                             <span asp-validation-for="Title" class="text-danger"></span>
                         </div>
 
-                        <div class="mb-4 p-3 border rounded bg-white shadow-sm">
-                            <label class="form-label fw-bold text-primary">Vorlesungsmaterial (PDF) - Optional</label>
-                            <input type="file" class="form-control" name="uploadedPdf" accept=".pdf" />
-                            <div class="form-text">Sie können das PDF auch später im Bearbeitungsmodus hochladen.</div>
-                        </div>
-
-                        <div class="d-flex justify-content-between">
+                        <div class="d-flex justify-content-between mt-5">
                             <a asp-action="Index" asp-route-courseId="@ViewBag.CourseId" class="btn btn-outline-secondary">Abbrechen</a>
-                            <button type="submit" class="btn btn-success px-4">Speichern</button>
+                            <button type="submit" class="btn btn-success px-4 fw-bold">Kapitel speichern</button>
                         </div>
                     </form>
                 </div>
@@ -44,4 +47,51 @@
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+
+    <script>
+        document.getElementById('btnSuggestTitle').addEventListener('click', async function() {
+            const fileInput = document.getElementById('pdfFileInput');
+            
+            if (!fileInput.files.length) {
+                alert("Bitte wähle zuerst ein PDF aus, damit die KI den Text analysieren kann!");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("pdfFile", fileInput.files[0]);
+
+            const btn = this;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "⏳ Analysiere PDF...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/Generator/SuggestTitle', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.title) {
+                    document.getElementById('chapterTitleInput').value = result.title;
+                    btn.classList.replace('btn-outline-warning', 'btn-success');
+                    btn.innerHTML = "✔ Titel generiert!";
+                    setTimeout(() => {
+                        btn.classList.replace('btn-success', 'btn-outline-warning');
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    alert("Konnte keinen Titel generieren: " + (result.message || "Unbekannter Fehler"));
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                alert("Fehler bei der Serververbindung.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        });
+    </script>
 }
