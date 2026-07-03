@@ -141,6 +141,7 @@ namespace WeProject.Controllers
         {
             var question = await _context.Questions
                 .Include(q => q.AnswerOptions)
+                .Include(q => q.Exams)
                 .FirstOrDefaultAsync(q => q.Id == id);
 
             if (question == null)
@@ -149,6 +150,12 @@ namespace WeProject.Controllers
             }
 
             int chapterId = question.ChapterId;
+
+            // Entferne alle Zuordnungen zu Prüfungen (behebt Foreign-Key-Konflikt)
+            if (question.Exams.Any())
+            {
+                question.Exams.Clear();
+            }
 
             _context.AnswerOptions.RemoveRange(question.AnswerOptions);
             _context.Questions.Remove(question);

@@ -7,36 +7,44 @@
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-success text-white">
+            <div class="card shadow-sm" style="border-color: #003366;">
+                <div class="card-header text-white" style="background-color: #003366;">
                     <h3 class="mb-0">Neues Kapitel anlegen</h3>
                 </div>
-                <div class="card-body bg-light">
-                    <form asp-action="Create" enctype="multipart/form-data">
+                <div class="card-body">
+                    <form asp-action="Create" enctype="multipart/form-data" id="createChapterForm">
                         <input type="hidden" asp-for="CourseId" value="@ViewBag.CourseId" />
-
-                        <div asp-validation-summary="All" class="text-danger fw-bold mb-3 p-2 border border-danger rounded bg-white"></div>
-
-                        <div class="mb-4 p-3 border rounded bg-white shadow-sm">
-                            <label class="form-label fw-bold text-primary">Vorlesungsmaterial (PDF)</label>
-                            <input type="file" id="pdfFileInput" class="form-control" name="uploadedPdf" accept=".pdf" />
-                            <div class="form-text">Lade zuerst das PDF hoch, um den Titel per KI generieren zu lassen!</div>
-                        </div>
+                        <input type="hidden" name="desiredFileName" id="desiredFileName" />
+                        <div asp-validation-summary="All" class="text-danger fw-bold mb-3"></div>
 
                         <div class="mb-4">
                             <label asp-for="Title" class="form-label fw-bold">Titel des Kapitels</label>
                             <div class="input-group">
                                 <input asp-for="Title" id="chapterTitleInput" class="form-control" placeholder="z. B. Einführung in ASP.NET" required />
-                                <button type="button" class="btn btn-outline-warning fw-bold text-dark" id="btnSuggestTitle">
-                                    ✨ Titel per KI generieren
+                                <button type="button" class="btn" style="background-color: #FFC107; color: #000;" id="btnSuggestTitle">
+                                    ✨ Titel aus PDF auslesen
                                 </button>
                             </div>
                             <span asp-validation-for="Title" class="text-danger"></span>
+                            <div id="titleGenerationFeedback" class="form-text mt-2"></div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Kapitelnummer</label>
+                            <input type="number" name="ChapterNumber" id="ChapterNumber" class="form-control" value="@ViewBag.NextChapterNumber" readonly />
+                            <div class="form-text">Die Nummer wird automatisch vergeben.</div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="pdfFileInput" class="form-label fw-bold">PDF-Dokument</label>
+                            <input type="file" id="pdfFileInput" class="form-control" name="uploadedPdf" accept=".pdf" required />
+                            <div class="form-text">Lade hier das Skript für das Kapitel hoch.</div>
+                            <div id="fileNameFeedback" class="form-text mt-2"></div>
                         </div>
 
                         <div class="d-flex justify-content-between mt-5">
                             <a asp-action="Index" asp-route-courseId="@ViewBag.CourseId" class="btn btn-outline-secondary">Abbrechen</a>
-                            <button type="submit" class="btn btn-success px-4 fw-bold">Kapitel speichern</button>
+                            <button type="submit" class="btn text-white" style="background-color: #003366;">Kapitel speichern</button>
                         </div>
                     </form>
                 </div>
@@ -49,49 +57,105 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
 
     <script>
-        document.getElementById('btnSuggestTitle').addEventListener('click', async function() {
-            const fileInput = document.getElementById('pdfFileInput');
-            
-            if (!fileInput.files.length) {
-                alert("Bitte wähle zuerst ein PDF aus, damit die KI den Text analysieren kann!");
-                return;
+        document.addEventListener('DOMContentLoaded', function () {
+            const feedbackBox = document.getElementById('titleGenerationFeedback');
+            const titleInput = document.getElementById('chapterTitleInput');
+            const suggestButton = document.getElementById('btnSuggestTitle');
+            const pdfFileInput = document.getElementById('pdfFileInput');
+            const desiredFileNameInput = document.getElementById('desiredFileName');
+            const fileNameFeedback = document.getElementById('fileNameFeedback');
+
+            function setFeedback(element, message, type = 'danger') {
+                element.textContent = message;
+                // Klassen sicher verwalten, um bestehende Klassen nicht zu überschreiben
+                element.classList.remove('text-danger', 'text-success', 'text-primary', 'text-warning');
+                element.classList.add(`text-${type}`);
             }
 
-            const formData = new FormData();
-            formData.append("pdfFile", fileInput.files[0]);
-
-            const btn = this;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = "⏳ Analysiere PDF...";
-            btn.disabled = true;
-
-            try {
-                const response = await fetch('/Generator/SuggestTitle', {
-                    method: 'POST',
-                    body: formData
-                });
+            suggestButton.addEventListener('click', async function() {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.pdf';
                 
-                const result = await response.json();
+                fileInput.onchange = async function() {
+                    if (!fileInput.files.length) {
+                        return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append('pdfFile', fileInput.files[0]);
+
+                    const originalText = suggestButton.innerHTML;
+                    suggestButton.innerHTML = '⏳ Analysiere PDF...';
+                    suggestButton.disabled = true;
+                    setFeedback(feedbackBox, 'Die KI analysiert das PDF und erstellt einen Titelvorschlag...', 'primary');
+
+                    try {
+                        const response = await fetch('/Generator/SuggestTitle', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (response.ok && result.success && result.title) {
+                            titleInput.value = result.title;
+                            setFeedback(feedbackBox, 'Titelvorschlag wurde erfolgreich übernommen.', 'success');
+                        } else {
+                            setFeedback(feedbackBox, result.message || 'Die KI konnte keinen Titel generieren. Bitte trage den Titel manuell ein.', 'danger');
+                        }
+                    } catch (error) {
+                        setFeedback(feedbackBox, 'Ein Fehler ist aufgetreten. Bitte versuche es erneut oder trage den Titel manuell ein.', 'danger');
+                    } finally {
+                        suggestButton.innerHTML = originalText;
+                        suggestButton.disabled = false;
+                    }
+                };
                 
-                if (result.success && result.title) {
-                    document.getElementById('chapterTitleInput').value = result.title;
-                    btn.classList.replace('btn-outline-warning', 'btn-success');
-                    btn.innerHTML = "✔ Titel generiert!";
-                    setTimeout(() => {
-                        btn.classList.replace('btn-success', 'btn-outline-warning');
-                        btn.innerHTML = originalText;
-                        btn.disabled = false;
-                    }, 2000);
-                } else {
-                    alert("Konnte keinen Titel generieren: " + (result.message || "Unbekannter Fehler"));
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
+                fileInput.click();
+            });
+
+            pdfFileInput.addEventListener('change', async function() {
+                if (!this.files.length) {
+                    return;
                 }
-            } catch (error) {
-                alert("Fehler bei der Serververbindung.");
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }
+
+                const fileName = this.files[0].name;
+                const genericNamePattern = /^(skript|script|vorlesung|lecture|kapitel|chapter|einfach-pdf|pdf)[\s_-]*\d*|guid/i;
+
+                if (genericNamePattern.test(fileName)) {
+                    setFeedback(fileNameFeedback, 'Generischer Dateiname erkannt. Frage KI nach einem besseren Namen...', 'primary');
+                    
+                    const formData = new FormData();
+                    formData.append('pdfFile', this.files[0]);
+
+                    try {
+                        const response = await fetch('/Chapter/SuggestFileName', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok && result.success && result.suggestedName) {
+                            const userConfirmed = confirm(`Die KI schlägt vor, die Datei in "${result.suggestedName}.pdf" umzubenennen. Einverstanden?`);
+                            if (userConfirmed) {
+                                desiredFileNameInput.value = `${result.suggestedName}.pdf`;
+                                setFeedback(fileNameFeedback, `Dateiname wird als "${result.suggestedName}.pdf" gespeichert.`, 'success');
+                            } else {
+                                desiredFileNameInput.value = '';
+                                setFeedback(fileNameFeedback, 'Der ursprüngliche Dateiname wird beibehalten.', 'warning');
+                            }
+                        } else {
+                            setFeedback(fileNameFeedback, result.message || 'Dateiname konnte nicht von der KI verbessert werden.', 'danger');
+                        }
+                    } catch (error) {
+                        setFeedback(fileNameFeedback, 'Fehler bei der Kommunikation mit dem Server.', 'danger');
+                    }
+                } else {
+                    fileNameFeedback.textContent = '';
+                }
+            });
         });
     </script>
 }

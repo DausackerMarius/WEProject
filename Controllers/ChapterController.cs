@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using System.Linq;
 using System.Threading.Tasks;
 using System;
+using System.Text.RegularExpressions;
 
 namespace WeProject.Controllers
 {
@@ -14,11 +15,32 @@ namespace WeProject.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IPdfStorageService _storageService;
+        private readonly IOpenAiService _openAiService;
 
-        public ChapterController(AppDbContext context, IPdfStorageService storageService)
+        public ChapterController(AppDbContext context, IPdfStorageService storageService, IOpenAiService openAiService)
         {
             _context = context;
             _storageService = storageService;
+            _openAiService = openAiService;
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SuggestFileName(IFormFile pdfFile)
+        {
+            if (pdfFile == null || pdfFile.Length == 0)
+            {
+                return Json(new { success = false, message = "Keine Datei empfangen." });
+            }
+
+            try
+            {
+                string suggestedName = await _openAiService.SuggestFileNameForPdfAsync(pdfFile);
+                return Json(new { success = true, suggestedName });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Fehler bei der KI-Analyse: {ex.Message}" });
+            }
         }
 
         // GET: Chapter?courseId=X
@@ -40,16 +62,22 @@ namespace WeProject.Controllers
         }
 
         // GET: Chapter/Create?courseId=X
-        public IActionResult Create(int courseId)
+        public async Task<IActionResult> Create(int courseId)
         {
+            var nextChapterNumber = await _context.Chapters
+                .Where(c => c.CourseId == courseId)
+                .Select(c => (int?)c.ChapterNumber)
+                .MaxAsync() ?? 0;
+
             ViewBag.CourseId = courseId;
+            ViewBag.NextChapterNumber = nextChapterNumber + 1;
             return View();
         }
 
         // POST: Chapter/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Title,CourseId")] Chapter chapter, IFormFile? uploadedPdf) // ChapterNumber entfernt aus Bind
+        public async Task<IActionResult> Create([Bind("Title,CourseId")] Chapter chapter, IFormFile? uploadedPdf, string? desiredFileName) // ChapterNumber entfernt, desiredFileName hinzugefügt
         {
             if (ModelState.IsValid)
             {
@@ -65,7 +93,8 @@ namespace WeProject.Controllers
 
                     if (uploadedPdf != null && uploadedPdf.Length > 0)
                     {
-                        string? cloudUrl = await _storageService.UploadPdfAsync(uploadedPdf);
+                        string fileNameToUse = string.IsNullOrWhiteSpace(desiredFileName) ? uploadedPdf.FileName : desiredFileName;
+                        string? cloudUrl = await _storageService.UploadPdfAsync(uploadedPdf, fileNameToUse);
                         chapter.PdfFilePath = cloudUrl;
                     }
 
@@ -83,7 +112,13 @@ namespace WeProject.Controllers
                 }
             }
 
+            var nextChapterNumber = await _context.Chapters
+                .Where(c => c.CourseId == chapter.CourseId)
+                .Select(c => (int?)c.ChapterNumber)
+                .MaxAsync() ?? 0;
+
             ViewBag.CourseId = chapter.CourseId;
+            ViewBag.NextChapterNumber = nextChapterNumber + 1;
             return View(chapter);
         }
 
