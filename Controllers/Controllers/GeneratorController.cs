@@ -42,6 +42,9 @@ namespace WeProject.Controllers
             return View();
         }
 
+        // NOTE: STUDENT MODE
+        // Default parameter `mode = "student"` enables the interactive student view (Selbsttest).
+        // We only annotate this for clarity — do not delete or change without coordinating with the team.
         [HttpPost]
         public async Task<IActionResult> UploadAndGenerate(IFormFile pdfFile, string mode = "student", int questionCount = 3)
         {

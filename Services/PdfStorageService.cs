@@ -16,7 +16,9 @@ namespace WeProject.Services
         public PdfStorageService(IConfiguration configuration)
         {
             // Greift auf den Verbindungsstring zu und stellt sicher, dass er nicht null ist, um die Compiler-Warnung zu beheben.
-            _connectionString = configuration.GetConnectionString("AzureBlobStorage") ?? "";
+            _connectionString = configuration.GetConnectionString("AzureBlobStorage")
+                ?? configuration["AzureBlobStorage"]
+                ?? string.Empty;
         }
 
         public async Task<string> UploadPdfAsync(IFormFile file)

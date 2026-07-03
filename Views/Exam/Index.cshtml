@@ -5,9 +5,12 @@
 }
 
 <div class="container mt-4">
-    <div class="mb-4">
+    <div class="mb-4 d-flex gap-2">
         <a asp-controller="Course" asp-action="Index" class="btn btn-outline-secondary">
             &larr; Zurück zur Kursliste
+        </a>
+        <a asp-controller="Chapter" asp-action="Index" asp-route-courseId="@Model.Id" class="btn btn-outline-primary">
+            📖 Zu den Kapiteln & Fragen
         </a>
     </div>
 

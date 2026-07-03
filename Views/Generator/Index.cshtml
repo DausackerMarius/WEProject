@@ -22,15 +22,13 @@
                 
                 <div class="col-md-6">
                     <label for="questionCount" class="form-label fw-bold">Anzahl der Fragen:</label>
-                    <input type="number" name="questionCount" id="questionCount" class="form-control" value="3" min="1" max="10" required />
+                    <input type="number" name="questionCount" id="questionCount" class="form-control" value="5" min="1" max="10" required />
                 </div>
                 
                 <div class="col-md-6">
-                    <label for="mode" class="form-label fw-bold">Ansichts-Modus:</label>
-                    <select name="mode" id="mode" class="form-select">
-                        <option value="student">👨‍🎓 Studenten-Modus (Interaktiver Selbsttest)</option>
-                        <option value="professor">👨‍🏫 Dozenten-Modus (Lösungen direkt anzeigen)</option>
-                    </select>
+                    <label class="form-label fw-bold">Ansichts-Modus:</label>
+                    <p class="text-muted small mb-0 mt-2">👨‍🏫 Dozenten-Modus (Lösungen werden direkt angezeigt)</p>
+                    <input type="hidden" name="mode" value="professor" />
                 </div>
             </div>
 

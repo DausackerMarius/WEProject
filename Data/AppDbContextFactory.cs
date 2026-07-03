@@ -18,7 +18,18 @@ namespace WeProject.Data
             var builder = new DbContextOptionsBuilder<AppDbContext>();
             
             // Holt sich den Connection String
-            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            var connectionString = configuration.GetConnectionString("DefaultConnection")
+                ?? configuration["ConnectionStrings:DefaultConnection"]
+                ?? configuration["DefaultConnection"]
+                ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                ?? Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection")
+                ?? Environment.GetEnvironmentVariable("SQLAZURECONNSTR_DefaultConnection")
+                ?? Environment.GetEnvironmentVariable("DefaultConnection");
+
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException("Die Datenbank-Verbindungszeichenfolge 'DefaultConnection' ist nicht konfiguriert oder leer.");
+            }
 
             // Nutzt den SQL Server
             builder.UseSqlServer(connectionString);

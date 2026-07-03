@@ -5,7 +5,12 @@
 
 <div class="container mt-5">
     
-    <a asp-controller="Chapter" asp-action="Index" asp-route-courseId="@Model.Chapter.CourseId" class="btn btn-outline-secondary mb-4">← Zurück zur Kapitelübersicht</a>
+    <div class="mb-4 d-flex gap-2">
+        <a asp-controller="Chapter" asp-action="Index" asp-route-courseId="@Model.Chapter.CourseId" class="btn btn-outline-secondary">← Zurück zur Kapitelübersicht</a>
+        <a asp-controller="Exam" asp-action="Index" asp-route-courseId="@Model.Chapter.CourseId" class="btn btn-outline-warning text-dark">
+            📝 Zu den Prüfungen
+        </a>
+    </div>
 
     @if (TempData["Success"] != null)
     {

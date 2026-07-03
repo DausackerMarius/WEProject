@@ -16,7 +16,9 @@ namespace WeProject.Services
         public GeminiService(HttpClient httpClient, IConfiguration config)
         {
             _httpClient = httpClient;
-            _apiKey = config["Gemini:ApiKey"] 
+            _apiKey = config["Gemini:ApiKey"]
+                      ?? config["Gemini__ApiKey"]
+                      ?? config["GeminiApiKey"]
                       ?? throw new InvalidOperationException("Gemini API Key fehlt.");
         }
 

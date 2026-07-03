@@ -85,5 +85,27 @@ namespace WeProject.Controllers
 
             return View(exam);
         }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var exam = await _context.Exams
+                .Include(e => e.Course)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (exam == null)
+            {
+                TempData["Error"] = "Prüfung nicht gefunden.";
+                return NotFound();
+            }
+
+            int courseId = exam.CourseId;
+            _context.Exams.Remove(exam);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"Prüfung vom {exam.ExamDate:dd.MM.yyyy} erfolgreich gelöscht.";
+            return RedirectToAction(nameof(Index), new { courseId = courseId });
+        }
     }
 }

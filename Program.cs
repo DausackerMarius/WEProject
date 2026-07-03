@@ -5,13 +5,36 @@ using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Logging immer auf der Konsole aktivieren, damit Azure Log Stream Startfehler zeigt.
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
+
 // 1. Standard MVC-Dienste hinzufügen
 builder.Services.AddControllersWithViews();
 
 // 2. Datenbank-Kontext für Azure SQL konfigurieren
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
+    ?? builder.Configuration["DefaultConnection"]
+    ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("SQLCONNSTR_DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("SQLAZURECONNSTR_DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("DefaultConnection");
+Console.WriteLine($"DefaultConnection configured: {!string.IsNullOrWhiteSpace(connectionString)}");
+Console.WriteLine($"Connection string length: {connectionString?.Length ?? 0}");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException(
+            "Die Datenbank-Verbindungszeichenfolge 'DefaultConnection' ist nicht konfiguriert oder leer.");
+    }
+
+    options.UseSqlServer(connectionString, sqlOptions =>
+        sqlOptions.EnableRetryOnFailure(3));
+});
 
 // 3. Cloud-Speicher-Dienst registrieren
 builder.Services.AddScoped<IPdfStorageService, PdfStorageService>();
@@ -22,7 +45,11 @@ builder.Services.AddHttpClient<IOpenAiService, GeminiService>(client =>
     client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
     
     // Liest den API-Schlüssel aus der Konfiguration (appsettings.json oder Azure App Settings)
-    string? geminiApiKey = builder.Configuration["Gemini:ApiKey"];
+    string? geminiApiKey = builder.Configuration["Gemini:ApiKey"]
+        ?? builder.Configuration["Gemini__ApiKey"]
+        ?? builder.Configuration["GeminiApiKey"];
+
+    Console.WriteLine($"Gemini API key configured: {!string.IsNullOrWhiteSpace(geminiApiKey)}");
     
     // Fügt den API-Schlüssel als Standard-Header für alle Anfragen dieses Clients hinzu
     if (!string.IsNullOrEmpty(geminiApiKey))
@@ -51,7 +78,7 @@ app.Use(async (context, next) =>
             Expires = DateTimeOffset.UtcNow.AddDays(30),
             HttpOnly = true,
             Secure = true, 
-            SameSite = SameSiteMode.Strict
+            SameSite = SameSiteMode.Lax
         });
 
         // Optional: Weiterleitung auf schöneren Link
@@ -89,16 +116,25 @@ try
     {
         var services = scope.ServiceProvider;
         var context = services.GetRequiredService<AppDbContext>();
-        Console.WriteLine("--> Attempting to connect to DB and apply migrations...");
         
-        // HIER WURDE ENSURECREATED DURCH MIGRATE ERSETZT:
-        context.Database.Migrate();
-        
-        Console.WriteLine("--> DB migrations applied successfully and schema is present.");
-        
-        Console.WriteLine("--> Initializing Seed Data...");
-        SeedData.Initialize(services);
-        Console.WriteLine("--> Seed Data finished.");
+        try
+        {
+            Console.WriteLine("--> Attempting to connect to DB and apply migrations...");
+            
+            // HIER WURDE ENSURECREATED DURCH MIGRATE ERSETZT:
+            context.Database.Migrate();
+            
+            Console.WriteLine("--> DB migrations applied successfully and schema is present.");
+            
+            Console.WriteLine("--> Initializing Seed Data...");
+            SeedData.Initialize(services);
+            Console.WriteLine("--> Seed Data finished.");
+        }
+        catch (Exception dbEx)
+        {
+            Console.WriteLine($"--> DB initialization failed (but continuing): {dbEx.Message}");
+            // Nicht fatal - die App kann ohne vollständige DB-Migration starten
+        }
     }
 
     // HTTP-Pipeline konfigurieren

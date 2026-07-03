@@ -23,6 +23,7 @@
         <h3>Kapitelübersicht</h3>
         <div>
             <a asp-controller="Course" asp-action="Index" class="btn btn-outline-secondary me-2">Zurück zur Kursliste</a>
+            <a asp-controller="Exam" asp-action="Index" asp-route-courseId="@Model?.Id" class="btn btn-outline-warning text-dark me-2 fw-bold">📝 Prüfungen</a>
             <a asp-action="Create" asp-route-courseId="@Model?.Id" class="btn btn-success fw-bold shadow-sm">Neues Kapitel anlegen</a>
         </div>
     </div>
