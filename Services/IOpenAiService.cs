@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 
 namespace WeProject.Services
 {
@@ -13,5 +14,8 @@ namespace WeProject.Services
 
         // NEU: Die Methode zum Generieren des Kapitel-Titels
         Task<string> GenerateTitleFromTextAsync(string documentText);
+
+        // NEU: Die Methode zum Vorschlagen eines Dateinamens
+        Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile);
     }
 }

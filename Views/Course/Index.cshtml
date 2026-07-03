@@ -37,9 +37,10 @@
                         @foreach (var course in Model)
                         {
                             <tr>
-                                <td class="fw-bold">
-                                    <a href="/Chapter?courseId=@course.Id" class="text-decoration-none text-primary fs-5 d-block">
-                                        @course.Title
+                                <td>
+                                    <a href="/Chapter?courseId=@course.Id" class="course-open-link">
+                                        <span class="fw-bold">@course.Title</span>
+                                        <span class="ms-2 badge bg-primary-subtle text-primary-emphasis">Öffnen</span>
                                     </a>
                                 </td>
                                 <td>@course.LecturerName</td>

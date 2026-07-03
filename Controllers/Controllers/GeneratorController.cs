@@ -39,7 +39,7 @@ namespace WeProject.Controllers
         [HttpGet]
         public IActionResult Index()
         {
-            return View();
+            return NotFound();
         }
 
         // NOTE: STUDENT MODE
@@ -237,8 +237,8 @@ namespace WeProject.Controllers
         [HttpPost]
         public async Task<IActionResult> SuggestTitle(IFormFile pdfFile)
         {
-            if (pdfFile == null || pdfFile.Length == 0) 
-                return Json(new { success = false, message = "Kein PDF ausgewählt." });
+            if (pdfFile == null || pdfFile.Length == 0)
+                return Json(new { success = false, message = "Bitte lade zuerst ein PDF hoch, damit die KI den Titel generieren kann." });
 
             string tempPath = Path.GetTempFileName();
             try
@@ -248,15 +248,23 @@ namespace WeProject.Controllers
                     await pdfFile.CopyToAsync(stream);
                 }
 
-                // Text extrahieren & KI fragen
                 string extractedText = _pdfExtractionService.ExtractTextFromPdf(tempPath);
                 string suggestedTitle = await _openAiService.GenerateTitleFromTextAsync(extractedText);
 
-                return Json(new { success = true, title = suggestedTitle });
+                if (string.IsNullOrWhiteSpace(suggestedTitle))
+                {
+                    return Json(new { success = false, message = "Die KI konnte aus diesem PDF keinen Titel ableiten. Bitte trage den Titel selbst ein." });
+                }
+
+                return Json(new { success = true, title = suggestedTitle.Trim() });
             }
-            catch (Exception ex)
+            catch (HttpRequestException ex) when (ex.Message.Contains("503"))
             {
-                return Json(new { success = false, message = ex.Message });
+                return Json(new { success = false, message = "Die KI ist gerade nicht verfügbar. Bitte versuche es später erneut oder trage den Titel selbst ein." });
+            }
+            catch (Exception)
+            {
+                return Json(new { success = false, message = "Die Titelgenerierung konnte gerade nicht abgeschlossen werden. Bitte prüfe das PDF oder trage den Titel selbst ein." });
             }
             finally
             {

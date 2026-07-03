@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Http;
 
 namespace WeProject.Services
 {
@@ -12,14 +13,46 @@ namespace WeProject.Services
     {
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
+        private readonly PdfTextExtractionService _pdfTextExtractionService;
 
-        public GeminiService(HttpClient httpClient, IConfiguration config)
+        public GeminiService(HttpClient httpClient, IConfiguration config, PdfTextExtractionService pdfTextExtractionService)
         {
             _httpClient = httpClient;
             _apiKey = config["Gemini:ApiKey"]
                       ?? config["Gemini__ApiKey"]
                       ?? config["GeminiApiKey"]
                       ?? throw new InvalidOperationException("Gemini API Key fehlt.");
+            _pdfTextExtractionService = pdfTextExtractionService;
+        }
+
+        public async Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile)
+        {
+            string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile);
+            
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            
+            string promptText = $@"Du bist ein präziser Assistent für die Dateiverwaltung. 
+            Analysiere den folgenden Text aus einem Vorlesungs-Skript und generiere einen passenden, extrem kurzen Dateinamen (maximal 3 bis 5 Wörter, keine Umlaute, keine Sonderzeichen, nur mit Bindestrichen getrennt). 
+            Antworte AUSSCHLIESSLICH mit dem Dateinamen, ohne die .pdf-Endung, ohne Anführungszeichen, ohne Markdown und ohne Erklärungen.
+            Beispiel: 'Einfuehrung-in-ASP-NET'
+            
+            Text: {documentText}";
+
+            var requestBody = new
+            {
+                contents = new[] { new { parts = new[] { new { text = promptText } } } }
+            };
+
+            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync(url, content);
+            
+            if (!response.IsSuccessStatusCode) return "";
+
+            var responseString = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(responseString);
+            
+            var generatedName = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? "";
+            return generatedName.Trim();
         }
 
         // 1. Die alte Methode zum Generieren

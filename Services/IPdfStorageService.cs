@@ -6,6 +6,7 @@ namespace WeProject.Services
     public interface IPdfStorageService
     {
         Task<string> UploadPdfAsync(IFormFile file);
+        Task<string> UploadPdfAsync(IFormFile file, string desiredName);
         Task DeletePdfAsync(string blobUrl);
     }
 }

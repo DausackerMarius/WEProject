@@ -1,11 +1,12 @@
 using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models; // WICHTIG: Diese Zeile ist neu für die HTTP-Header!
+using Azure.Storage.Blobs.Models;
 using WeProject.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace WeProject.Services
 {
@@ -16,13 +17,52 @@ namespace WeProject.Services
 
         public PdfStorageService(IConfiguration configuration)
         {
-            // Greift auf den Verbindungsstring zu und stellt sicher, dass er nicht null ist, um die Compiler-Warnung zu beheben.
             _connectionString = configuration.GetConnectionString("AzureBlobStorage")
                 ?? configuration["AzureBlobStorage"]
                 ?? string.Empty;
         }
 
-        public async Task<string> UploadPdfAsync(IFormFile file)
+        private string SanitizeFileName(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return "document";
+
+            // Entferne die Erweiterung vorübergehend
+            string nameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
+            string extension = Path.GetExtension(fileName);
+
+            // Ersetze Umlaute und Sonderzeichen
+            nameWithoutExtension = nameWithoutExtension
+                .Replace("ä", "ae")
+                .Replace("ö", "oe")
+                .Replace("ü", "ue")
+                .Replace("ß", "ss")
+                .Replace("Ä", "AE")
+                .Replace("Ö", "OE")
+                .Replace("Ü", "UE");
+
+            // Entferne alle Zeichen außer Buchstaben, Zahlen, Bindestrichen und Unterstrichen
+            nameWithoutExtension = Regex.Replace(nameWithoutExtension, @"[^a-zA-Z0-9_-]", "-");
+
+            // Ersetze mehrfache Bindestriche durch einen
+            nameWithoutExtension = Regex.Replace(nameWithoutExtension, @"-+", "-");
+
+            // Entferne führende/nachfolgende Bindestriche
+            nameWithoutExtension = nameWithoutExtension.Trim('-');
+
+            // Begrenze die Länge
+            if (nameWithoutExtension.Length > 50)
+                nameWithoutExtension = nameWithoutExtension.Substring(0, 50);
+
+            return nameWithoutExtension + extension;
+        }
+
+        public Task<string> UploadPdfAsync(IFormFile file)
+        {
+            return UploadPdfAsync(file, file.FileName);
+        }
+
+        public async Task<string> UploadPdfAsync(IFormFile file, string desiredName)
         {
             if (file == null || file.Length == 0)
             {
@@ -39,17 +79,25 @@ namespace WeProject.Services
             
             await blobContainerClient.CreateIfNotExistsAsync();
 
-            // Eindeutigen Namen für das Blob generieren, um Überschreibungen zu vermeiden
-            var uniqueBlobName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+            // Sanitize den Dateinamen und füge Timestamp hinzu
+            string sanitizedName = SanitizeFileName(desiredName);
+            string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd-HHmmss");
+            string nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitizedName);
+            string extension = Path.GetExtension(sanitizedName);
+            
+            string uniqueBlobName = $"{nameWithoutExtension}_{timestamp}{extension}";
             var blobClient = blobContainerClient.GetBlobClient(uniqueBlobName);
 
-            // NEU: Wir definieren den Content-Type als PDF, damit der Browser es öffnet und nicht herunterlädt
-            var blobHttpHeaders = new BlobHttpHeaders { ContentType = "application/pdf" };
+            // Content-Type und Content-Disposition setzen, damit der Browser die PDF anzeigt statt sie herunterzuladen
+            var blobHttpHeaders = new BlobHttpHeaders
+            {
+                ContentType = "application/pdf",
+                ContentDisposition = $"inline; filename=\"{uniqueBlobName}\""
+            };
             var uploadOptions = new BlobUploadOptions { HttpHeaders = blobHttpHeaders };
 
             await using (var stream = file.OpenReadStream())
             {
-                // NEU: Wir übergeben die uploadOptions an Azure
                 await blobClient.UploadAsync(stream, uploadOptions);
             }
 
