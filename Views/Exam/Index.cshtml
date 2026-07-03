@@ -22,11 +22,12 @@
         <div class="alert alert-success">@TempData["Success"]</div>
     }
 
-    <div class="row mb-5">
-        <div class="col-md-8">
-            <div class="card shadow-sm border-0 h-100 bg-light">
+    <div class="row mb-5 justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm border-0 bg-light">
                 <div class="card-body p-4">
-                    <h5 class="card-title mb-3">Neue Prüfung erstellen</h5>
+                    <h5 class="card-title mb-3 text-primary">Neue Prüfung aus dem Fragenpool erstellen</h5>
+                    <p class="text-muted small mb-4">Das System stellt automatisch eine zufällige Prüfung aus allen KI-generierten Fragen der verschiedenen Kapitel zusammen.</p>
                     <form asp-action="Generate" method="post">
                         <input type="hidden" name="courseId" value="@Model.Id" />
                         <div class="row g-3 align-items-end">
@@ -43,49 +44,11 @@
                                 <input type="number" id="questionCount" name="questionCount" class="form-control" min="1" value="10" required />
                             </div>
                             <div class="col-md-3">
-                                <button type="submit" class="btn btn-warning fw-bold shadow-sm w-100">Prüfung generieren</button>
+                                <button type="submit" class="btn btn-success fw-bold shadow-sm w-100">Prüfung generieren</button>
                             </div>
                         </div>
                     </form>
                 </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card shadow-sm border-0 h-100 bg-light">
-                <div class="card-body">
-                    <h5 class="card-title">✨ KI-Fragen aus PDF generieren</h5>
-                    <p class="text-muted small mt-2 mb-3">Lade ein Vorlesungs-PDF hoch, um automatisch neue Fragen für diese Veranstaltung zu erzeugen.</p>
-                    <button type="button" class="btn btn-warning font-weight-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#kiUploadModal">
-                        PDF hochladen & Fragen generieren
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="kiUploadModal" tabindex="-1" aria-labelledby="kiUploadModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="kiUploadModalLabel">✨ KI-Fragen aus PDF generieren</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form asp-controller="Generator" asp-action="GenerateForChapter" method="post" enctype="multipart/form-data">
-                    <div class="modal-body">
-                        <input type="hidden" name="chapterId" value="@Model.Id" />
-                        
-                        <div class="mb-3">
-                            <label for="pdfFile" class="form-label">Wähle das Vorlesungs-PDF aus:</label>
-                            <input type="file" name="pdfFile" class="form-control" accept=".pdf" required />
-                        </div>
-                        <p class="text-muted small">Die KI liest das Dokument aus und erstellt automatisch 3 Multiple-Choice-Fragen.</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                        <button type="submit" class="btn btn-warning">Generieren starten</button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
@@ -109,7 +72,6 @@
                             <div class="d-grid gap-2">
                                 <a asp-action="Print" asp-route-id="@exam.Id" target="_blank" class="btn btn-outline-primary fw-bold">Druckansicht öffnen</a>
                                 
-                                <!-- LÖSCHEN-BUTTON -->
                                 <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#deleteConfirmationModal"
@@ -129,11 +91,10 @@
         else
         {
             <div class="col-12">
-                <div class="alert alert-secondary">Bisher wurden keine Prüfungen für diese Veranstaltung generiert.</div>
+                <div class="alert alert-secondary text-center p-4">Bisher wurden keine Prüfungen für diese Veranstaltung generiert.</div>
             </div>
         }
     </div>
 </div>
 
-<!-- Das Modal am Ende der Seite einbinden -->
 <partial name="_DeleteConfirmation" />
