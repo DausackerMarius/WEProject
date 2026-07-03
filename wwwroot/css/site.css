@@ -29,3 +29,25 @@ body {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
 }
+
+/* Small, Bootstrap-compatible overrides for the Privacy page */
+:root{
+  /* Uni Würzburg Farben (aus uni-wue-theme.css) */
+  --we-primary:#364f78; /* --uni-wue-blue */
+  --we-light:#a6bad9;   /* --uni-wue-light-blue */
+  --we-muted:#738393;   /* --uni-wue-grey */
+}
+
+.container { max-width: 920px; }
+
+h1 { color: var(--we-primary); font-weight:600; }
+.lead { color: var(--we-muted); }
+
+section { padding:1rem; border-radius:0.5rem; background:#fff; box-shadow:0 1px 2px rgba(2,6,23,0.04); border:1px solid rgba(15,23,36,0.03); }
+
+/* Utility spacing in case Bootstrap utilities aren't present */
+.mb-3{ margin-bottom:0.75rem !important; }
+.mb-4{ margin-bottom:1rem !important; }
+.py-4{ padding-top:1rem !important; padding-bottom:1rem !important; }
+
+@media (max-width:640px){ .container{ padding:1rem; } h1{ font-size:1.5rem; } }
