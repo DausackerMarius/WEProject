@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models; // WICHTIG: Diese Zeile ist neu für die HTTP-Header!
 using WeProject.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
@@ -42,9 +43,14 @@ namespace WeProject.Services
             var uniqueBlobName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
             var blobClient = blobContainerClient.GetBlobClient(uniqueBlobName);
 
+            // NEU: Wir definieren den Content-Type als PDF, damit der Browser es öffnet und nicht herunterlädt
+            var blobHttpHeaders = new BlobHttpHeaders { ContentType = "application/pdf" };
+            var uploadOptions = new BlobUploadOptions { HttpHeaders = blobHttpHeaders };
+
             await using (var stream = file.OpenReadStream())
             {
-                await blobClient.UploadAsync(stream, true);
+                // NEU: Wir übergeben die uploadOptions an Azure
+                await blobClient.UploadAsync(stream, uploadOptions);
             }
 
             return blobClient.Uri.ToString();

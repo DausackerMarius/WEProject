@@ -5,7 +5,6 @@ using WeProject.Models;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Globalization;
 
 namespace WeProject.Controllers
 {
@@ -50,14 +49,12 @@ namespace WeProject.Controllers
             }
 
             var randomQuestions = allQuestions.OrderBy(q => Guid.NewGuid()).Take(questionCount).ToList();
-
-            // Kombinieren von Datum und Uhrzeit zu einem einzigen DateTime-Objekt
             var examDateTime = examDate.ToDateTime(examTime);
 
             var newExam = new Exam
             {
                 CourseId = courseId,
-                ExamDate = examDateTime, // Das neue, festgelegte Datum verwenden
+                ExamDate = examDateTime,
                 Questions = randomQuestions
             };
 

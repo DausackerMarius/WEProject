@@ -25,10 +25,10 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-dark">
                         <tr>
-                            <th scope="col" style="width: 25%;">Titel</th>
+                            <th scope="col" style="width: 30%;">Titel</th>
                             <th scope="col" style="width: 20%;">Dozent</th>
                             <th scope="col" style="width: 10%;">Typ</th>
-                            <th scope="col" style="width: 15%;" class="text-center">Kapitelübersicht</th>
+                            <th scope="col" style="width: 10%;" class="text-center">Kapitel</th>
                             <th scope="col" style="width: 15%;" class="text-center">Prüfungen</th>
                             <th scope="col" style="width: 15%;" class="text-end">Aktionen</th>
                         </tr>
@@ -37,7 +37,11 @@
                         @foreach (var course in Model)
                         {
                             <tr>
-                                <td class="fw-bold">@course.Title</td>
+                                <td class="fw-bold">
+                                    <a href="/Chapter?courseId=@course.Id" class="text-decoration-none text-primary fs-5 d-block">
+                                        @course.Title
+                                    </a>
+                                </td>
                                 <td>@course.LecturerName</td>
                                 <td>
                                     <span class="badge @(course.IsMasterCourse ? "bg-info text-dark" : "bg-secondary")">
@@ -45,15 +49,12 @@
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                    <a href="/Chapter?courseId=@course.Id" class="btn btn-primary btn-sm position-relative shadow-sm">
-                                        Kapitel
-                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
-                                            @course.Chapters.Count
-                                        </span>
-                                    </a>
+                                    <span class="badge bg-light text-dark border fs-6 shadow-sm">
+                                        @course.Chapters.Count
+                                    </span>
                                 </td>
                                 <td class="text-center">
-                                    <a href="/Exam?courseId=@course.Id" class="btn btn-warning btn-sm position-relative text-dark fw-bold shadow-sm">
+                                    <a href="/Exam?courseId=@course.Id" class="btn btn-outline-warning btn-sm position-relative text-dark fw-bold shadow-sm">
                                         Prüfungen
                                         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-dark border border-light">
                                             @course.Exams.Count
@@ -92,9 +93,7 @@
     }
 </div>
 
-<!-- Das Modal am Ende der Seite einbinden -->
 <partial name="_DeleteConfirmation" />
 
 @section Scripts {
-    <!-- Hier könnten bei Bedarf noch Seitenspezifische Skripte hin -->
-}
+    }
