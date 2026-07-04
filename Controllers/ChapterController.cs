@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using System.Linq;
 using System.Threading.Tasks;
 using System;
-using System.Text.RegularExpressions;
 
 namespace WeProject.Controllers
 {
@@ -77,7 +76,7 @@ namespace WeProject.Controllers
         // POST: Chapter/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Title,CourseId")] Chapter chapter, IFormFile? uploadedPdf, string? desiredFileName) // ChapterNumber entfernt, desiredFileName hinzugefügt
+        public async Task<IActionResult> Create([Bind("Title,CourseId")] Chapter chapter, IFormFile? uploadedPdf, string? desiredFileName)
         {
             if (ModelState.IsValid)
             {
@@ -93,7 +92,12 @@ namespace WeProject.Controllers
 
                     if (uploadedPdf != null && uploadedPdf.Length > 0)
                     {
-                        string fileNameToUse = string.IsNullOrWhiteSpace(desiredFileName) ? uploadedPdf.FileName : desiredFileName;
+                        // FIX: Die KI liefert den Namen OHNE .pdf. Azure braucht die Endung aber zwingend, 
+                        // damit Browser und Betriebssysteme die Datei korrekt als PDF erkennen!
+                        string fileNameToUse = string.IsNullOrWhiteSpace(desiredFileName) 
+                            ? uploadedPdf.FileName 
+                            : (desiredFileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? desiredFileName : desiredFileName + ".pdf");
+
                         string? cloudUrl = await _storageService.UploadPdfAsync(uploadedPdf, fileNameToUse);
                         chapter.PdfFilePath = cloudUrl;
                     }
@@ -162,6 +166,7 @@ namespace WeProject.Controllers
                             await _storageService.DeletePdfAsync(chapter.PdfFilePath);
                         }
 
+                        // Auch beim nachträglichen Editieren lädt der Service die Datei sicher hoch
                         string? cloudUrl = await _storageService.UploadPdfAsync(uploadedPdf);
                         chapter.PdfFilePath = cloudUrl;
                     }
