@@ -14,16 +14,27 @@
 
     @if (TempData["Success"] != null)
     {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
             @TempData["Success"]
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
     @if (TempData["Error"] != null)
     {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
             @TempData["Error"]
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ValidationResult"] != null)
+    {
+        <div class="alert alert-info shadow-sm position-relative fade show mb-4 border-info" role="alert">
+            <h5 class="alert-heading fw-bold text-info-emphasis">🤖 KI-Gutachten zu deiner Frage</h5>
+            <p class="small text-muted mb-2">Frage: "@TempData["ValidatedQuestionText"]"</p>
+            <hr>
+            <p class="mb-0" style="white-space: pre-line;">@TempData["ValidationResult"]</p>
+            <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
 
@@ -63,7 +74,7 @@
                     </ul>
                     
                     <div class="d-flex justify-content-end align-items-center">
-                        <form asp-controller="Question" asp-action="ValidateQuestion" method="post" class="m-0 p-0 me-2">
+                        <form asp-controller="Question" asp-action="ValidateQuestion" method="post" class="m-0 p-0 me-2" onsubmit="var btn = this.querySelector('button'); btn.innerHTML = '⏳ KI prüft...'; btn.classList.add('disabled');">
                             <input type="hidden" name="questionId" value="@question.Id" />
                             <input type="hidden" name="chapterId" value="@Model.Chapter.Id" />
                             <button type="submit" class="btn btn-sm btn-outline-info fw-bold">🤖 Durch KI prüfen lassen</button>
@@ -94,7 +105,6 @@
     }
 </div>
 
-<!-- Modal für KI-Generator -->
 <div class="modal fade" id="kiGeneratorModal" tabindex="-1" aria-labelledby="kiGeneratorModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-warning">
@@ -146,14 +156,10 @@
     </div>
 </div>
 
-
-<!-- Das Modal für die Lösch-Bestätigung -->
 <partial name="_DeleteConfirmation" />
 
 @section Scripts {
     <script>
-        // Logik, um das 'required' Attribut beim Upload zu deaktivieren, wenn das andere Formular abgeschickt wird.
-        // Dies verhindert einen Validierungsfehler, wenn man das vorhandene PDF nutzen möchte.
         document.addEventListener('DOMContentLoaded', function() {
             const kiModal = document.getElementById('kiGeneratorModal');
             if(kiModal) {

@@ -165,7 +165,7 @@ namespace WeProject.Controllers
         }
 
         // ========================================================
-        // NEU: HIER IST DAS KI-VALIDIERUNGS-MODUL
+        // KI-VALIDIERUNGS-MODUL (Optimiert)
         // ========================================================
         [HttpPost]
         public async Task<IActionResult> ValidateQuestion(int questionId, int chapterId)
@@ -176,11 +176,17 @@ namespace WeProject.Controllers
 
             if (question != null)
             {
-                var answers = question.AnswerOptions.Select(a => a.Text).ToList();
+                // OPTIMIERUNG: Wir markieren die richtige Antwort explizit für die KI
+                var answersForAi = question.AnswerOptions
+                    .Select(a => a.IsCorrect ? $"[KORREKTE ANTWORT]: {a.Text}" : $"[FALSCHE ANTWORT]: {a.Text}")
+                    .ToList();
+                
+                // Wir zwingen die KI durch eine Zusatzinstruktion, genau zu erklären, WARUM die markierte korrekt ist
+                string contextInstructions = " Erkläre kurz und präzise in 2-3 Sätzen, warum die von mir als [KORREKTE ANTWORT] markierte Option fachlich richtig ist und warum die anderen falsch sind.";
                 
                 try
                 {
-                    string feedback = await _openAiService.ValidateQuestionAsync(question.Text, answers);
+                    string feedback = await _openAiService.ValidateQuestionAsync(question.Text + contextInstructions, answersForAi);
                     TempData["ValidationResult"] = feedback;
                     TempData["ValidatedQuestionText"] = question.Text;
                 }
