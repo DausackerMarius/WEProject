@@ -39,8 +39,8 @@ namespace WeProject.Services
             // PERFORMANCE-FIX: Max 10.000 Zeichen (reicht für Titel völlig aus, schont Netzwerk)
             string truncatedText = documentText.Length > 10000 ? documentText.Substring(0, 10000) : documentText;
             
-            // FIX: Markdown aus der URL entfernt und Modell auf 1.5-flash korrigiert
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
+            // SAUBERE URL MIT KORREKTEM MODELL (2.5-flash)
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string promptText = $@"Du bist ein präziser Assistent für die Dateiverwaltung. 
             Analysiere den folgenden Starttext aus einem Vorlesungs-Skript und generiere einen passenden, extrem kurzen Dateinamen (maximal 3 bis 5 Wörter, keine Umlaute, keine Sonderzeichen, nur mit Bindestrichen getrennt). 
@@ -67,8 +67,8 @@ namespace WeProject.Services
             // PERFORMANCE-FIX: Max 100.000 Zeichen (ca. 40-50 Seiten) schützt vor API-Timeouts bei 32MB PDFs
             string truncatedText = documentText.Length > 100000 ? documentText.Substring(0, 100000) : documentText;
 
-            // FIX: Markdown aus der URL entfernt
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
+            // SAUBERE URL MIT KORREKTEM MODELL (2.5-flash)
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string systemPrompt = $@"Du bist ein strenger Universitätsprofessor. 
             Erstelle aus dem folgenden Text exakt {questionCount} Multiple-Choice-Fragen auf akademischem Niveau. 
@@ -80,7 +80,7 @@ namespace WeProject.Services
             {
                 systemInstruction = new { parts = new[] { new { text = systemPrompt } } },
                 contents = new[] { new { parts = new[] { new { text = truncatedText } } } },
-                // Google generiert hier garantiert pures JSON, keine manuelle Säuberung mehr nötig!
+                // Google generiert hier garantiert pures JSON
                 generationConfig = new { responseMimeType = "application/json", temperature = 0.3 }
             };
 
@@ -91,8 +91,8 @@ namespace WeProject.Services
         // FEATURE 3: Didaktischer Gutachter (Validierung der Fragen)
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
-            // FIX: Markdown aus der URL entfernt
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
+            // SAUBERE URL MIT KORREKTEM MODELL (2.5-flash)
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string answersText = string.Join("\n- ", answers);
             
@@ -125,8 +125,8 @@ namespace WeProject.Services
         {
             if (string.IsNullOrWhiteSpace(documentText)) return "Neues Kapitel (Kein Text)";
 
-            // FIX: Markdown aus der URL entfernt
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
+            // SAUBERE URL MIT KORREKTEM MODELL (2.5-flash)
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string truncatedText = documentText.Length > 10000 ? documentText.Substring(0, 10000) : documentText;
 
@@ -159,9 +159,8 @@ namespace WeProject.Services
         }
 
         // =========================================================================
-        // ADAPTERFASSADE: ORCHESTRIERUNG & KUGELSICHERES JSON-PARSING
+        // ADAPTERFASSADE: ORCHESTRIERUNG & JSON-PARSING
         // =========================================================================
-        // HINWEIS: Der fehleranfällige 'cleanJson' Parameter wurde restlos entfernt.
         private async Task<string> ExecuteAiRequestAsync(string url, string jsonPayload)
         {
             int maxRetries = 3; 
@@ -189,7 +188,6 @@ namespace WeProject.Services
                                 parts.GetArrayLength() > 0)
                             {
                                 var text = parts[0].GetProperty("text").GetString() ?? "";
-                                // Purer, ungefilterter Text. Kein Replace-Absturz mehr möglich.
                                 return text.Trim();
                             }
                             else if (firstCandidate.TryGetProperty("finishReason", out var finishReason))
