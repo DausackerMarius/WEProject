@@ -30,8 +30,8 @@ namespace WeProject.Services
         {
             string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile);
             
-            // KORREKTUR: Nutzung des aktuellen 3.1 Modells
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key={_apiKey}";
+            // KORREKTUR: Nutzt exakt das Modell der Partnerin (2.5 Flash)
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string promptText = $@"Du bist ein präziser Assistent für die Dateiverwaltung. 
             Analysiere den folgenden Text aus einem Vorlesungs-Skript und generiere einen passenden, extrem kurzen Dateinamen (maximal 3 bis 5 Wörter, keine Umlaute, keine Sonderzeichen, nur mit Bindestrichen getrennt). 
@@ -53,7 +53,7 @@ namespace WeProject.Services
         // FEATURE 2: Multiple-Choice Fragen generieren
         public async Task<string> GenerateQuestionsFromTextAsync(string documentText, int questionCount)
         {
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key={_apiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string systemPrompt = $@"Du bist ein strenger Universitätsprofessor. 
             Erstelle aus dem folgenden Text exakt {questionCount} Multiple-Choice-Fragen auf akademischem Niveau. 
@@ -75,7 +75,7 @@ namespace WeProject.Services
         // FEATURE 3: Didaktischer Gutachter (Validierung der Fragen)
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key={_apiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string answersText = string.Join(" | ", answers);
             string promptText = $@"Prüfe die folgende Multiple-Choice-Frage:
@@ -99,7 +99,7 @@ namespace WeProject.Services
         // FEATURE 4: Kapitel-Titel generieren
         public async Task<string> GenerateTitleFromTextAsync(string documentText)
         {
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key={_apiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string promptText = $@"Du bist ein präziser Assistent für Universitätsprofessoren. 
             Analysiere den folgenden Text eines Vorlesungs-Skripts und generiere einen passenden, extrem kurzen Titel (maximal 3 bis 6 Wörter) für dieses Kapitel. 
@@ -127,6 +127,7 @@ namespace WeProject.Services
 
             for (int i = 0; i < maxRetries; i++)
             {
+                // Request-Inhalt MUSS in der Schleife instanziiert werden, da er nach dem Senden verbraucht ist
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
                 var response = await _httpClient.PostAsync(url, content);
                 
