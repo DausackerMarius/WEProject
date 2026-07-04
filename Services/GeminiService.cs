@@ -19,24 +19,44 @@ namespace WeProject.Services
         public GeminiService(HttpClient httpClient, IConfiguration config, PdfTextExtractionService pdfTextExtractionService)
         {
             _httpClient = httpClient;
-            // Der API Key wird wie gewohnt sicher aus der Konfiguration geladen
+            // API Key initialisieren
             _apiKey = config["Gemini:ApiKey"]
                       ?? config["Gemini__ApiKey"]
                       ?? config["GeminiApiKey"]
                       ?? throw new InvalidOperationException("Gemini API Key fehlt.");
             _pdfTextExtractionService = pdfTextExtractionService;
+            
+            // WICHTIG: Das Setzen von _httpClient.Timeout wurde hier entfernt, 
+            // um Dependency Injection Crashes zu verhindern. Gesteuert wird das Timeout jetzt sicher unten.
         }
 
         // =========================================================================
-        // HILFSMETHODE: 100% sicheres Abschneiden von riesigen PDFs (Anti-Absturz)
+        // HILFSMETHODEN: 100% Sicherheit gegen kaputte PDFs und API-Crashes
         // =========================================================================
+        
+        // 1. Desinfiziert den Text von unsichtbaren Steuerzeichen (Killt den 400 Bad Request Fehler)
+        private string SanitizeForApi(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return "";
+            var sb = new StringBuilder(input.Length);
+            foreach (char c in input)
+            {
+                // Lässt nur echte Zeichen, Zeilenumbrüche und Tabs durch
+                if (!char.IsControl(c) || c == '\n' || c == '\r' || c == '\t')
+                {
+                    sb.Append(c);
+                }
+            }
+            return sb.ToString();
+        }
+
+        // 2. Schneidet den Text sicher ab, ohne Unicode-Zeichen (Surrogate Pairs) in der Mitte zu spalten
         private string SafeTruncate(string text, int maxLength)
         {
             if (string.IsNullOrEmpty(text)) return "";
             if (text.Length <= maxLength) return text;
             
             int length = maxLength;
-            // Verhindert, dass Sonderzeichen in der Mitte durchtrennt werden und 400-Fehler auslösen
             if (char.IsHighSurrogate(text[maxLength - 1]))
             {
                 length--;
@@ -47,7 +67,9 @@ namespace WeProject.Services
         // FEATURE 1: Dateinamen generieren 
         public async Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile)
         {
-            string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile) ?? "";
+            string rawText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile) ?? "";
+            string documentText = SanitizeForApi(rawText);
+            
             if (string.IsNullOrWhiteSpace(documentText)) return "Neues-Dokument";
 
             string truncatedText = SafeTruncate(documentText, 10000);
@@ -69,17 +91,15 @@ namespace WeProject.Services
             
             if (string.IsNullOrWhiteSpace(result) || result.Trim().Length <= 1) return "Neues-Dokument";
 
-            // C# erzwingt die Namenskonvention des Lastenhefts
             return result.Replace("\"", "").Replace("'", "").Replace("**", "").Replace("*", "").Replace(" ", "-").Trim();
         }
 
         // FEATURE 2: Multiple-Choice Fragen generieren (Lastenheft-konform)
         public async Task<string> GenerateQuestionsFromTextAsync(string documentText, int questionCount)
         {
-            documentText ??= "";
+            documentText = SanitizeForApi(documentText);
             if (string.IsNullOrWhiteSpace(documentText)) return "[]"; 
 
-            // Text wird auf 100.000 Zeichen gekürzt, damit die API nicht überlastet
             string truncatedText = SafeTruncate(documentText, 100000);
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
@@ -97,7 +117,7 @@ namespace WeProject.Services
             string jsonPayload = JsonSerializer.Serialize(requestBody);
             string result = await ExecuteAiRequestAsync(url, jsonPayload);
 
-            // GARANTIE: Zieht zielsicher nur das Array heraus, selbst wenn Markdown-Reste existieren
+            // Zieht absolut sicher nur das JSON-Array heraus, selbst wenn die KI quatscht
             int startIndex = result.IndexOf('[');
             int endIndex = result.LastIndexOf(']');
             if (startIndex >= 0 && endIndex >= startIndex)
@@ -108,21 +128,24 @@ namespace WeProject.Services
             return "[]"; 
         }
 
-        // FEATURE 3: Didaktischer Gutachter (Exakt nach Lastenheft)
+        // FEATURE 3: Didaktischer Gutachter (Sicherer Fließtext)
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
             answers ??= new List<string>(); 
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             string answersText = string.Join(" | ", answers);
             
+            string cleanQuestion = SanitizeForApi(questionText);
+            string cleanAnswers = SanitizeForApi(answersText);
+
             string promptText = $@"Bewerte diese Klausurfrage als Gutachter auf exakt zwei Kriterien:
             1. Sprachliche Korrektheit
             2. Eindeutigkeit (Gibt es logisch exakt eine richtige Antwort?)
 
-            Frage: {questionText}
-            Optionen: {answersText}
+            Frage: {cleanQuestion}
+            Optionen: {cleanAnswers}
             
-            Schreibe dein Gutachten als EINEN EINZIGEN zusammenhängenden Fließtext-Absatz (ca. 3-4 Sätze). Begründe deine Entscheidung.
+            Schreibe dein Gutachten als EINEN EINZIGEN zusammenhängenden Fließtext-Absatz (ca. 3 Sätze). Begründe deine Entscheidung.
             VERBOTEN: Verwende absolut keine Überschriften, keine Aufzählungen, keine Zahlen und keine Sternchen.";
 
             var requestBody = new
@@ -134,14 +157,13 @@ namespace WeProject.Services
             string jsonPayload = JsonSerializer.Serialize(requestBody);
             string result = await ExecuteAiRequestAsync(url, jsonPayload);
             
-            // Säubert hartnäckige KI-Formatierungen (Sternchen, Rauten), falls sie doch auftauchen
             return result.Replace("**", "").Replace("###", "").Replace("##", "").Replace("#", "").Trim();
         }
 
         // FEATURE 4: Kapitel-Titel generieren 
         public async Task<string> GenerateTitleFromTextAsync(string documentText)
         {
-            documentText ??= "";
+            documentText = SanitizeForApi(documentText);
             if (string.IsNullOrWhiteSpace(documentText)) return "Neues Kapitel (Kein Text)";
 
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
@@ -167,7 +189,7 @@ namespace WeProject.Services
         }
 
         // =========================================================================
-        // ADAPTERFASSADE: ORCHESTRIERUNG, GC-CLEANUP & ISOLIERTES TIMEOUT
+        // ADAPTERFASSADE: ORCHESTRIERUNG, MULTI-PART PARSING & TIMEOUT-SCHUTZ
         // =========================================================================
         private async Task<string> ExecuteAiRequestAsync(string url, string jsonPayload)
         {
@@ -180,9 +202,8 @@ namespace WeProject.Services
                 {
                     using var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
                     
-                    // Isoliertes Timeout verhindert C#-Abstürze bei Dependency Injection
+                    // Isoliertes Timeout: Schützt die Applikation vor ASP.NET Crashes
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(180));
-                    
                     using var response = await _httpClient.PostAsync(url, content, cts.Token);
                     
                     if (response.IsSuccessStatusCode)
@@ -198,7 +219,16 @@ namespace WeProject.Services
                                 resContent.TryGetProperty("parts", out var parts) && 
                                 parts.GetArrayLength() > 0)
                             {
-                                return parts[0].GetProperty("text").GetString() ?? "";
+                                // Löst das Problem des abgeschnittenen Gutachtens: Setzt ALLE Blöcke zusammen!
+                                var sb = new StringBuilder();
+                                foreach (var part in parts.EnumerateArray())
+                                {
+                                    if (part.TryGetProperty("text", out var textProp))
+                                    {
+                                        sb.Append(textProp.GetString());
+                                    }
+                                }
+                                return sb.ToString().Trim();
                             }
                             else if (firstCandidate.TryGetProperty("finishReason", out var finishReason))
                             {
@@ -217,6 +247,8 @@ namespace WeProject.Services
 
                     var errorContent = await response.Content.ReadAsStringAsync();
                     if ((int)response.StatusCode == 429) throw new HttpRequestException("KI überlastet. Bitte kurz warten.");
+                    
+                    // Wirft harte 400-Fehler (falls doch mal eine Rest-Anomalie im PDF steckt), damit es sauber ins Log geht.
                     throw new HttpRequestException($"API Fehler {(int)response.StatusCode}: {errorContent}");
                 }
                 catch (JsonException)
