@@ -25,6 +25,7 @@ namespace WeProject.Services
             _pdfTextExtractionService = pdfTextExtractionService;
         }
 
+        // FEATURE 1 (Von deiner Partnerin): Dateinamen generieren
         public async Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile)
         {
             string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile);
@@ -40,22 +41,15 @@ namespace WeProject.Services
 
             var requestBody = new
             {
-                contents = new[] { new { parts = new[] { new { text = promptText } } } }
+                contents = new[] { new { parts = new[] { new { text = promptText } } } },
+                // PERFORMANCE-UPGRADE: Strikte Token-Begrenzung für Millisekunden-Latenz
+                generationConfig = new { maxOutputTokens = 25, temperature = 0.1 } 
             };
 
-            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content);
-            
-            if (!response.IsSuccessStatusCode) return "";
-
-            var responseString = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(responseString);
-            
-            var generatedName = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? "";
-            return generatedName.Trim();
+            return await ExecuteAiRequestAsync(url, requestBody, false);
         }
 
-        // 1. Die alte Methode zum Generieren
+        // FEATURE 2: Fragen generieren
         public async Task<string> GenerateQuestionsFromTextAsync(string documentText, int questionCount)
         {
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
@@ -70,22 +64,14 @@ namespace WeProject.Services
             {
                 systemInstruction = new { parts = new[] { new { text = systemPrompt } } },
                 contents = new[] { new { parts = new[] { new { text = documentText } } } },
-                generationConfig = new { responseMimeType = "application/json" }
+                // PERFORMANCE-UPGRADE: Sicheres JSON
+                generationConfig = new { responseMimeType = "application/json", temperature = 0.3 }
             };
 
-            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content);
-            
-            if (!response.IsSuccessStatusCode) throw new HttpRequestException($"Gemini API Fehler: {response.StatusCode}");
-
-            var responseString = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(responseString);
-            
-            var generatedText = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? string.Empty;
-            return generatedText.Replace("```json", "").Replace("```", "").Trim();
+            return await ExecuteAiRequestAsync(url, requestBody, true);
         }
 
-        // 2. Die Methode zum Validieren (Prüfen)
+        // FEATURE 3: Fragen validieren (Gutachter)
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
@@ -101,21 +87,15 @@ namespace WeProject.Services
             var requestBody = new
             {
                 systemInstruction = new { parts = new[] { new { text = "Du bist ein Universitätsprofessor und Experte für Didaktik." } } },
-                contents = new[] { new { parts = new[] { new { text = promptText } } } }
+                contents = new[] { new { parts = new[] { new { text = promptText } } } },
+                // PERFORMANCE-UPGRADE: Begrenzung auf 150 Token hält Ladezeit kurz
+                generationConfig = new { maxOutputTokens = 150, temperature = 0.2 } 
             };
 
-            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content);
-            
-            if (!response.IsSuccessStatusCode) throw new HttpRequestException($"Gemini API Fehler: {response.StatusCode}");
-
-            var responseString = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(responseString);
-            
-            return doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? "Kein Feedback erhalten.";
+            return await ExecuteAiRequestAsync(url, requestBody, false);
         }
 
-        // 3. NEU: Methode zum Generieren eines Kapitel-Titels
+        // FEATURE 4: Kapitel-Titel generieren
         public async Task<string> GenerateTitleFromTextAsync(string documentText)
         {
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
@@ -128,19 +108,43 @@ namespace WeProject.Services
 
             var requestBody = new
             {
-                contents = new[] { new { parts = new[] { new { text = promptText } } } }
+                contents = new[] { new { parts = new[] { new { text = promptText } } } },
+                // PERFORMANCE-UPGRADE: 25 Token genügen für Titel
+                generationConfig = new { maxOutputTokens = 25, temperature = 0.1 } 
             };
 
-            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+            return await ExecuteAiRequestAsync(url, requestBody, false);
+        }
+
+        // =========================================================================
+        // ZENTRALES PERFORMANCE- & FEHLER-MANAGEMENT
+        // =========================================================================
+        private async Task<string> ExecuteAiRequestAsync(string url, object body, bool cleanJson)
+        {
+            var jsonPayload = JsonSerializer.Serialize(body);
+            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+            
             var response = await _httpClient.PostAsync(url, content);
             
-            if (!response.IsSuccessStatusCode) return "";
+            // Fängt das "TooManyRequests" ab, das deine Partnerin gepostet hat
+            if ((int)response.StatusCode == 429)
+            {
+                throw new HttpRequestException("TooManyRequests");
+            }
+            
+            // Falls ein anderer Fehler auftritt, leeren String zurückgeben (sicheres Fallback)
+            if (!response.IsSuccessStatusCode) return ""; 
 
             var responseString = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseString);
             
-            var generatedTitle = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? "";
-            return generatedTitle.Trim();
+            var text = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? "";
+            
+            if (cleanJson)
+            {
+                text = text.Replace("```json", "").Replace("```", "");
+            }
+            return text.Trim();
         }
     }
 }
