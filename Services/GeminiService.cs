@@ -25,12 +25,11 @@ namespace WeProject.Services
             _pdfTextExtractionService = pdfTextExtractionService;
         }
 
-        // FEATURE 1: Dateinamen generieren
+        // FEATURE 1: Dateinamen generieren (Optionale Extra-Funktion)
         public async Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile)
         {
             string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile);
             
-            // KORREKTUR: Nutzt exakt das Modell der Partnerin (2.5 Flash)
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string promptText = $@"Du bist ein präziser Assistent für die Dateiverwaltung. 
@@ -72,24 +71,32 @@ namespace WeProject.Services
             return await ExecuteAiRequestAsync(url, jsonPayload, true);
         }
 
-        // FEATURE 3: Didaktischer Gutachter (Validierung der Fragen)
+        // FEATURE 3: Didaktischer Gutachter (Validierung der Fragen) - PERFEKTIONIERTER PROMPT
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
-            string answersText = string.Join(" | ", answers);
-            string promptText = $@"Prüfe die folgende Multiple-Choice-Frage:
-            Frage: {questionText}
-            Antwortoptionen: {answersText}
+            string answersText = string.Join("\n- ", answers);
             
-            Ist die Frage sprachlich korrekt formuliert? Gibt es bei diesen Optionen exakt EINE eindeutig richtige Antwort, oder sind mehrere richtig/falsch? 
-            Antworte als Gutachter kurz, präzise und in maximal 2-3 Sätzen.";
+            string promptText = $@"Du hast die Aufgabe, diese Prüfungsfrage als Gutachter zu bewerten. 
+            Prüfe die Frage und die Antworten strikt auf diese zwei Kriterien:
+            1. Sind die Frage und alle Antworten sprachlich korrekt formuliert?
+            2. Ist die Frage eindeutig beantwortbar (d.h., gibt es logisch betrachtet exakt EINE korrekte Antwort)?
+
+            Frage: 
+            {questionText}
+            
+            Optionen:
+            - {answersText}
+            
+            Gib ein kompaktes, professionelles Gutachten ab. Gehe direkt auf die Sprache und die Eindeutigkeit ein.";
 
             var requestBody = new
             {
-                systemInstruction = new { parts = new[] { new { text = "Du bist ein Universitätsprofessor und Experte für Didaktik." } } },
+                systemInstruction = new { parts = new[] { new { text = "Du bist ein strenger und präziser Hochschul-Gutachter für Klausurfragen." } } },
                 contents = new[] { new { parts = new[] { new { text = promptText } } } },
-                generationConfig = new { maxOutputTokens = 150, temperature = 0.2 } 
+                // LÖSUNG FÜR DEN ABBRUCH: Ausreichend Token (500) zur Verfügung gestellt, damit das Gutachten komplett durchläuft!
+                generationConfig = new { maxOutputTokens = 500, temperature = 0.2 } 
             };
 
             string jsonPayload = JsonSerializer.Serialize(requestBody);
@@ -127,7 +134,6 @@ namespace WeProject.Services
 
             for (int i = 0; i < maxRetries; i++)
             {
-                // Request-Inhalt MUSS in der Schleife instanziiert werden, da er nach dem Senden verbraucht ist
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
                 var response = await _httpClient.PostAsync(url, content);
                 
