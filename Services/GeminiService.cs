@@ -18,6 +18,12 @@ namespace WeProject.Services
         public GeminiService(HttpClient httpClient, IConfiguration config, PdfTextExtractionService pdfTextExtractionService)
         {
             _httpClient = httpClient;
+            // Best Practice: Ein generelles Timeout für den Client setzen, damit die App bei KI-Analysen nie einfriert
+            if (_httpClient.Timeout == System.Threading.Timeout.InfiniteTimeSpan)
+            {
+                _httpClient.Timeout = TimeSpan.FromSeconds(60);
+            }
+            
             _apiKey = config["Gemini:ApiKey"]
                       ?? config["Gemini__ApiKey"]
                       ?? config["GeminiApiKey"]
@@ -25,11 +31,12 @@ namespace WeProject.Services
             _pdfTextExtractionService = pdfTextExtractionService;
         }
 
-        // FEATURE 1: Dateinamen generieren (Optionale Extra-Funktion)
+        // FEATURE 1: Dateinamen generieren
         public async Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile)
         {
             string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile);
             
+            // KORREKTUR: Gematcht auf das öffentlich zugängliche und funktionierende 2.5 Flash
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
             
             string promptText = $@"Du bist ein präziser Assistent für die Dateiverwaltung. 
@@ -71,7 +78,7 @@ namespace WeProject.Services
             return await ExecuteAiRequestAsync(url, jsonPayload, true);
         }
 
-        // FEATURE 3: Didaktischer Gutachter (Validierung der Fragen) - PERFEKTIONIERTER PROMPT
+        // FEATURE 3: Didaktischer Gutachter (Validierung der Fragen)
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
@@ -95,7 +102,7 @@ namespace WeProject.Services
             {
                 systemInstruction = new { parts = new[] { new { text = "Du bist ein strenger und präziser Hochschul-Gutachter für Klausurfragen." } } },
                 contents = new[] { new { parts = new[] { new { text = promptText } } } },
-                // LÖSUNG FÜR DEN ABBRUCH: Ausreichend Token (500) zur Verfügung gestellt, damit das Gutachten komplett durchläuft!
+                // FIX: Hohes Token-Limit (500), damit Gutachten nicht mehr in der Mitte abbrechen
                 generationConfig = new { maxOutputTokens = 500, temperature = 0.2 } 
             };
 
@@ -125,7 +132,7 @@ namespace WeProject.Services
         }
 
         // =========================================================================
-        // ADAPTERFASSADE: ORCHESTRIERUNG & EXPONENTIAL BACKOFF RETRY
+        // ADAPTERFASSADE: ORCHESTRIERUNG, EXPONENTIAL BACKOFF & TIMEOUT-HANDLING
         // =========================================================================
         private async Task<string> ExecuteAiRequestAsync(string url, string jsonPayload, bool cleanJson)
         {
@@ -134,42 +141,54 @@ namespace WeProject.Services
 
             for (int i = 0; i < maxRetries; i++)
             {
-                var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync(url, content);
-                
-                if (response.IsSuccessStatusCode)
+                try
                 {
-                    var responseString = await response.Content.ReadAsStringAsync();
-                    using var doc = JsonDocument.Parse(responseString);
+                    var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+                    var response = await _httpClient.PostAsync(url, content);
                     
-                    var text = doc.RootElement.GetProperty("candidates")[0]
-                        .GetProperty("content").GetProperty("parts")[0]
-                        .GetProperty("text").GetString() ?? "";
-                    
-                    if (cleanJson)
+                    if (response.IsSuccessStatusCode)
                     {
-                        text = text.Replace("```json", "").Replace("```", "");
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        using var doc = JsonDocument.Parse(responseString);
+                        
+                        var text = doc.RootElement.GetProperty("candidates")[0]
+                            .GetProperty("content").GetProperty("parts")[0]
+                            .GetProperty("text").GetString() ?? "";
+                        
+                        if (cleanJson)
+                        {
+                            text = text.Replace("```json", "").Replace("```", "");
+                        }
+                        return text.Trim();
                     }
-                    return text.Trim();
-                }
 
-                // Retry bei Überlastung (429 Too Many Requests) oder Server-Fehler (503 Service Unavailable)
-                if (((int)response.StatusCode == 429 || (int)response.StatusCode == 503) && i < (maxRetries - 1))
-                {
-                    await Task.Delay(delayMilliseconds);
-                    delayMilliseconds *= 2; 
-                    continue; 
-                }
+                    // Retry bei Überlastung (429) oder Server-Fehler (500, 502, 503, 504)
+                    if (((int)response.StatusCode == 429 || (int)response.StatusCode >= 500) && i < (maxRetries - 1))
+                    {
+                        await Task.Delay(delayMilliseconds);
+                        delayMilliseconds *= 2; 
+                        continue; 
+                    }
 
-                // Fehler werfen, falls das Limit endgültig erreicht ist oder ein anderer Fehler vorliegt
-                var errorContent = await response.Content.ReadAsStringAsync();
-                
-                if ((int)response.StatusCode == 429)
-                {
-                    throw new HttpRequestException("Die KI-Schnittstelle ist aktuell stark ausgelastet. Bitte warte einen Moment.");
-                }
+                    var errorContent = await response.Content.ReadAsStringAsync();
                     
-                throw new HttpRequestException($"Gemini API Fehler ({response.StatusCode}): {errorContent}");
+                    if ((int)response.StatusCode == 429)
+                    {
+                        throw new HttpRequestException("Die KI-Schnittstelle ist aktuell stark ausgelastet. Bitte warte einen Moment.");
+                    }
+                        
+                    throw new HttpRequestException($"Gemini API Fehler ({(int)response.StatusCode}): {errorContent}");
+                }
+                catch (TaskCanceledException) // Fängt Timeouts sicher ab
+                {
+                    if (i < (maxRetries - 1))
+                    {
+                        await Task.Delay(delayMilliseconds);
+                        delayMilliseconds *= 2;
+                        continue;
+                    }
+                    throw new HttpRequestException("Zeitüberschreitung bei der Anfrage an die KI-Schnittstelle. Bitte überprüfe deine Internetverbindung oder versuche es später noch einmal.");
+                }
             }
 
             return string.Empty;
