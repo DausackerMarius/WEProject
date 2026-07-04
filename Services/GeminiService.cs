@@ -18,7 +18,7 @@ namespace WeProject.Services
         public GeminiService(HttpClient httpClient, IConfiguration config, PdfTextExtractionService pdfTextExtractionService)
         {
             _httpClient = httpClient;
-            // Best Practice: Ein generelles Timeout für den Client setzen, damit die App bei KI-Analysen nie einfriert
+            // Best Practice: Großzügiges Timeout (60s), damit die KI bei großen PDFs nie einfriert
             if (_httpClient.Timeout == System.Threading.Timeout.InfiniteTimeSpan)
             {
                 _httpClient.Timeout = TimeSpan.FromSeconds(60);
@@ -36,30 +36,37 @@ namespace WeProject.Services
         {
             string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile);
             
-            // KORREKTUR: Gematcht auf das öffentlich zugängliche und funktionierende 2.5 Flash
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            // PERFORMANCE-FIX: Max 10.000 Zeichen (reicht für Titel völlig aus, schont Netzwerk)
+            string truncatedText = documentText.Length > 10000 ? documentText.Substring(0, 10000) : documentText;
+            
+            var url = $"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){_apiKey}";
             
             string promptText = $@"Du bist ein präziser Assistent für die Dateiverwaltung. 
-            Analysiere den folgenden Text aus einem Vorlesungs-Skript und generiere einen passenden, extrem kurzen Dateinamen (maximal 3 bis 5 Wörter, keine Umlaute, keine Sonderzeichen, nur mit Bindestrichen getrennt). 
+            Analysiere den folgenden Starttext aus einem Vorlesungs-Skript und generiere einen passenden, extrem kurzen Dateinamen (maximal 3 bis 5 Wörter, keine Umlaute, keine Sonderzeichen, nur mit Bindestrichen getrennt). 
             Antworte AUSSCHLIESSLICH mit dem Dateinamen, ohne die .pdf-Endung, ohne Anführungszeichen, ohne Markdown und ohne Erklärungen.
             Beispiel: 'Einfuehrung-in-ASP-NET'
             
-            Text: {documentText}";
+            Textauszug: {truncatedText}";
 
             var requestBody = new
             {
                 contents = new[] { new { parts = new[] { new { text = promptText } } } },
-                generationConfig = new { maxOutputTokens = 25, temperature = 0.1 } 
+                generationConfig = new { maxOutputTokens = 30, temperature = 0.1 } 
             };
 
             string jsonPayload = JsonSerializer.Serialize(requestBody);
-            return await ExecuteAiRequestAsync(url, jsonPayload, false);
+            var result = await ExecuteAiRequestAsync(url, jsonPayload);
+            
+            return (string.IsNullOrWhiteSpace(result) || result.Trim().Length <= 1) ? "Neues-Dokument" : result;
         }
 
         // FEATURE 2: Multiple-Choice Fragen generieren
         public async Task<string> GenerateQuestionsFromTextAsync(string documentText, int questionCount)
         {
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            // PERFORMANCE-FIX: Max 100.000 Zeichen (ca. 40-50 Seiten) schützt vor API-Timeouts bei 32MB PDFs
+            string truncatedText = documentText.Length > 100000 ? documentText.Substring(0, 100000) : documentText;
+
+            var url = $"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){_apiKey}";
             
             string systemPrompt = $@"Du bist ein strenger Universitätsprofessor. 
             Erstelle aus dem folgenden Text exakt {questionCount} Multiple-Choice-Fragen auf akademischem Niveau. 
@@ -70,18 +77,19 @@ namespace WeProject.Services
             var requestBody = new
             {
                 systemInstruction = new { parts = new[] { new { text = systemPrompt } } },
-                contents = new[] { new { parts = new[] { new { text = documentText } } } },
+                contents = new[] { new { parts = new[] { new { text = truncatedText } } } },
+                // Google generiert hier garantiert pures JSON, keine manuelle Säuberung mehr nötig!
                 generationConfig = new { responseMimeType = "application/json", temperature = 0.3 }
             };
 
             string jsonPayload = JsonSerializer.Serialize(requestBody);
-            return await ExecuteAiRequestAsync(url, jsonPayload, true);
+            return await ExecuteAiRequestAsync(url, jsonPayload);
         }
 
         // FEATURE 3: Didaktischer Gutachter (Validierung der Fragen)
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            var url = $"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){_apiKey}";
             
             string answersText = string.Join("\n- ", answers);
             
@@ -102,39 +110,55 @@ namespace WeProject.Services
             {
                 systemInstruction = new { parts = new[] { new { text = "Du bist ein strenger und präziser Hochschul-Gutachter für Klausurfragen." } } },
                 contents = new[] { new { parts = new[] { new { text = promptText } } } },
-                // FIX: Hohes Token-Limit (500), damit Gutachten nicht mehr in der Mitte abbrechen
                 generationConfig = new { maxOutputTokens = 500, temperature = 0.2 } 
             };
 
             string jsonPayload = JsonSerializer.Serialize(requestBody);
-            return await ExecuteAiRequestAsync(url, jsonPayload, false);
+            return await ExecuteAiRequestAsync(url, jsonPayload);
         }
 
         // FEATURE 4: Kapitel-Titel generieren
         public async Task<string> GenerateTitleFromTextAsync(string documentText)
         {
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            if (string.IsNullOrWhiteSpace(documentText)) return "Neues Kapitel (Kein Text)";
+
+            var url = $"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){_apiKey}";
             
-            string promptText = $@"Du bist ein präziser Assistent für Universitätsprofessoren. 
-            Analysiere den folgenden Text eines Vorlesungs-Skripts und generiere einen passenden, extrem kurzen Titel (maximal 3 bis 6 Wörter) für dieses Kapitel. 
-            Antworte AUSSCHLIESSLICH mit dem Titel, ohne Anführungszeichen, ohne Markdown und ohne Erklärungen.
+            string truncatedText = documentText.Length > 10000 ? documentText.Substring(0, 10000) : documentText;
+
+            string systemPrompt = "Du bist ein präziser Assistent für Universitätsprofessoren. Deine EINZIGE Aufgabe ist es, einen Titel zu finden. Antworte NIEMALS mit nur einem einzelnen Buchstaben!";
+
+            string promptText = $@"Lies den folgenden Starttext eines Vorlesungs-Skripts. 
+            Generiere einen passenden, extrem kurzen Titel (maximal 3 bis 6 Wörter) für dieses Kapitel. 
+            Falls im Text eine Kapitelnummer steht (z.B. 'Kapitel 1: Grundlagen'), übernimm diese.
+            Antworte AUSSCHLIESSLICH mit dem Titel, ohne Einleitung und ohne Anführungszeichen.
             
-            Text: {documentText}";
+            Textauszug:
+            {truncatedText}";
 
             var requestBody = new
             {
+                systemInstruction = new { parts = new[] { new { text = systemPrompt } } },
                 contents = new[] { new { parts = new[] { new { text = promptText } } } },
-                generationConfig = new { maxOutputTokens = 25, temperature = 0.1 } 
+                generationConfig = new { maxOutputTokens = 50, temperature = 0.1 } 
             };
 
             string jsonPayload = JsonSerializer.Serialize(requestBody);
-            return await ExecuteAiRequestAsync(url, jsonPayload, false);
+            var result = await ExecuteAiRequestAsync(url, jsonPayload);
+
+            if (string.IsNullOrWhiteSpace(result) || result.Trim().Length <= 1)
+            {
+                return "Neues Kapitel (Generiert)";
+            }
+
+            return result;
         }
 
         // =========================================================================
-        // ADAPTERFASSADE: ORCHESTRIERUNG, EXPONENTIAL BACKOFF & TIMEOUT-HANDLING
+        // ADAPTERFASSADE: ORCHESTRIERUNG & KUGELSICHERES JSON-PARSING
         // =========================================================================
-        private async Task<string> ExecuteAiRequestAsync(string url, string jsonPayload, bool cleanJson)
+        // HINWEIS: Der fehleranfällige 'cleanJson' Parameter wurde restlos entfernt.
+        private async Task<string> ExecuteAiRequestAsync(string url, string jsonPayload)
         {
             int maxRetries = 3; 
             int delayMilliseconds = 2500; 
@@ -151,18 +175,28 @@ namespace WeProject.Services
                         var responseString = await response.Content.ReadAsStringAsync();
                         using var doc = JsonDocument.Parse(responseString);
                         
-                        var text = doc.RootElement.GetProperty("candidates")[0]
-                            .GetProperty("content").GetProperty("parts")[0]
-                            .GetProperty("text").GetString() ?? "";
+                        var root = doc.RootElement;
                         
-                        if (cleanJson)
+                        if (root.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
                         {
-                            text = text.Replace("```json", "").Replace("```", "");
+                            var firstCandidate = candidates[0];
+                            if (firstCandidate.TryGetProperty("content", out var resContent) && 
+                                resContent.TryGetProperty("parts", out var parts) && 
+                                parts.GetArrayLength() > 0)
+                            {
+                                var text = parts[0].GetProperty("text").GetString() ?? "";
+                                // Purer, ungefilterter Text. Kein Replace-Absturz mehr möglich.
+                                return text.Trim();
+                            }
+                            else if (firstCandidate.TryGetProperty("finishReason", out var finishReason))
+                            {
+                                throw new Exception($"Google KI hat die Antwort blockiert. Grund: {finishReason.GetString()}");
+                            }
                         }
-                        return text.Trim();
+                        return "";
                     }
 
-                    // Retry bei Überlastung (429) oder Server-Fehler (500, 502, 503, 504)
+                    // Auto-Retry bei Überlastung (429) oder Server-Fehler (500+)
                     if (((int)response.StatusCode == 429 || (int)response.StatusCode >= 500) && i < (maxRetries - 1))
                     {
                         await Task.Delay(delayMilliseconds);
@@ -171,7 +205,6 @@ namespace WeProject.Services
                     }
 
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    
                     if ((int)response.StatusCode == 429)
                     {
                         throw new HttpRequestException("Die KI-Schnittstelle ist aktuell stark ausgelastet. Bitte warte einen Moment.");
@@ -179,7 +212,7 @@ namespace WeProject.Services
                         
                     throw new HttpRequestException($"Gemini API Fehler ({(int)response.StatusCode}): {errorContent}");
                 }
-                catch (TaskCanceledException) // Fängt Timeouts sicher ab
+                catch (TaskCanceledException)
                 {
                     if (i < (maxRetries - 1))
                     {
@@ -187,7 +220,7 @@ namespace WeProject.Services
                         delayMilliseconds *= 2;
                         continue;
                     }
-                    throw new HttpRequestException("Zeitüberschreitung bei der Anfrage an die KI-Schnittstelle. Bitte überprüfe deine Internetverbindung oder versuche es später noch einmal.");
+                    throw new HttpRequestException("Zeitüberschreitung (Timeout) bei der Anfrage. Das PDF ist möglicherweise zu groß.");
                 }
             }
 
