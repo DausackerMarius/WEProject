@@ -25,7 +25,7 @@ namespace WeProject.Services
             _pdfTextExtractionService = pdfTextExtractionService;
         }
 
-        // FEATURE 1: Dateinamen generieren
+        // FEATURE 1: Dateinamen generieren (Intelligente Benennung)
         public async Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile)
         {
             string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile);
@@ -45,12 +45,11 @@ namespace WeProject.Services
                 generationConfig = new { maxOutputTokens = 25, temperature = 0.1 } 
             };
 
-            // FIX: Direkt hier serialisieren, bevor der Typ verloren geht!
             string jsonPayload = JsonSerializer.Serialize(requestBody);
             return await ExecuteAiRequestAsync(url, jsonPayload, false);
         }
 
-        // FEATURE 2: Fragen generieren
+        // FEATURE 2: Multiple-Choice Fragen generieren
         public async Task<string> GenerateQuestionsFromTextAsync(string documentText, int questionCount)
         {
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
@@ -72,7 +71,7 @@ namespace WeProject.Services
             return await ExecuteAiRequestAsync(url, jsonPayload, true);
         }
 
-        // FEATURE 3: Fragen validieren (Gutachter)
+        // FEATURE 3: Didaktischer Gutachter (Validierung der Fragen)
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
@@ -118,35 +117,55 @@ namespace WeProject.Services
         }
 
         // =========================================================================
-        // ZENTRALES PERFORMANCE- & FEHLER-MANAGEMENT (Bulletproof)
+        // ADAPTERFASSADE: ORCHESTRIERUNG & EXPONENTIAL BACKOFF RETRY
         // =========================================================================
         private async Task<string> ExecuteAiRequestAsync(string url, string jsonPayload, bool cleanJson)
         {
-            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-            
-            var response = await _httpClient.PostAsync(url, content);
-            
-            // Wenn etwas schiefgeht, werfen wir den EXAKTEN Fehler, damit nichts stumm abstürzt!
-            if (!response.IsSuccessStatusCode) 
+            int maxRetries = 3; 
+            int delayMilliseconds = 2500; // Startet mit 2,5 Sekunden Wartezeit bei Überlastung
+
+            for (int i = 0; i < maxRetries; i++)
             {
+                // Wichtig: StringContent muss in der Schleife neu instanziiert werden
+                var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(url, content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(responseString);
+                    
+                    var text = doc.RootElement.GetProperty("candidates")[0]
+                        .GetProperty("content").GetProperty("parts")[0]
+                        .GetProperty("text").GetString() ?? "";
+                    
+                    if (cleanJson)
+                    {
+                        text = text.Replace("```json", "").Replace("```", "");
+                    }
+                    return text.Trim();
+                }
+
+                // Fall: API-Limit erreicht (429) oder Server kurzfristig überlastet (503)
+                if (((int)response.StatusCode == 429 || (int)response.StatusCode == 503) && i < (maxRetries - 1))
+                {
+                    await Task.Delay(delayMilliseconds);
+                    delayMilliseconds *= 2; // Exponential Backoff: Erhöht die Wartezeit (2.5s -> 5.0s)
+                    continue; // Startet den nächsten Versuch der Schleife
+                }
+
+                // Wenn alle Retries aufgebraucht sind oder ein schwerer anderer Fehler vorliegt:
                 var errorContent = await response.Content.ReadAsStringAsync();
                 
                 if ((int)response.StatusCode == 429)
-                    throw new HttpRequestException("Google API Limit erreicht (TooManyRequests). Bitte warte eine Minute.");
+                {
+                    throw new HttpRequestException("Die KI-Schnittstelle ist aktuell stark ausgelastet. Bitte warte einen Moment.");
+                }
                     
                 throw new HttpRequestException($"Gemini API Fehler ({response.StatusCode}): {errorContent}");
             }
 
-            var responseString = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(responseString);
-            
-            var text = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? "";
-            
-            if (cleanJson)
-            {
-                text = text.Replace("```json", "").Replace("```", "");
-            }
-            return text.Trim();
+            return string.Empty;
         }
     }
 }
