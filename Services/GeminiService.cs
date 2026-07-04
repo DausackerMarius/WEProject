@@ -25,7 +25,7 @@ namespace WeProject.Services
             _pdfTextExtractionService = pdfTextExtractionService;
         }
 
-        // FEATURE 1 (Von deiner Partnerin): Dateinamen generieren
+        // FEATURE 1: Dateinamen generieren
         public async Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile)
         {
             string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile);
@@ -42,11 +42,12 @@ namespace WeProject.Services
             var requestBody = new
             {
                 contents = new[] { new { parts = new[] { new { text = promptText } } } },
-                // PERFORMANCE-UPGRADE: Strikte Token-Begrenzung für Millisekunden-Latenz
                 generationConfig = new { maxOutputTokens = 25, temperature = 0.1 } 
             };
 
-            return await ExecuteAiRequestAsync(url, requestBody, false);
+            // FIX: Direkt hier serialisieren, bevor der Typ verloren geht!
+            string jsonPayload = JsonSerializer.Serialize(requestBody);
+            return await ExecuteAiRequestAsync(url, jsonPayload, false);
         }
 
         // FEATURE 2: Fragen generieren
@@ -64,11 +65,11 @@ namespace WeProject.Services
             {
                 systemInstruction = new { parts = new[] { new { text = systemPrompt } } },
                 contents = new[] { new { parts = new[] { new { text = documentText } } } },
-                // PERFORMANCE-UPGRADE: Sicheres JSON
                 generationConfig = new { responseMimeType = "application/json", temperature = 0.3 }
             };
 
-            return await ExecuteAiRequestAsync(url, requestBody, true);
+            string jsonPayload = JsonSerializer.Serialize(requestBody);
+            return await ExecuteAiRequestAsync(url, jsonPayload, true);
         }
 
         // FEATURE 3: Fragen validieren (Gutachter)
@@ -88,11 +89,11 @@ namespace WeProject.Services
             {
                 systemInstruction = new { parts = new[] { new { text = "Du bist ein Universitätsprofessor und Experte für Didaktik." } } },
                 contents = new[] { new { parts = new[] { new { text = promptText } } } },
-                // PERFORMANCE-UPGRADE: Begrenzung auf 150 Token hält Ladezeit kurz
                 generationConfig = new { maxOutputTokens = 150, temperature = 0.2 } 
             };
 
-            return await ExecuteAiRequestAsync(url, requestBody, false);
+            string jsonPayload = JsonSerializer.Serialize(requestBody);
+            return await ExecuteAiRequestAsync(url, jsonPayload, false);
         }
 
         // FEATURE 4: Kapitel-Titel generieren
@@ -109,31 +110,32 @@ namespace WeProject.Services
             var requestBody = new
             {
                 contents = new[] { new { parts = new[] { new { text = promptText } } } },
-                // PERFORMANCE-UPGRADE: 25 Token genügen für Titel
                 generationConfig = new { maxOutputTokens = 25, temperature = 0.1 } 
             };
 
-            return await ExecuteAiRequestAsync(url, requestBody, false);
+            string jsonPayload = JsonSerializer.Serialize(requestBody);
+            return await ExecuteAiRequestAsync(url, jsonPayload, false);
         }
 
         // =========================================================================
-        // ZENTRALES PERFORMANCE- & FEHLER-MANAGEMENT
+        // ZENTRALES PERFORMANCE- & FEHLER-MANAGEMENT (Bulletproof)
         // =========================================================================
-        private async Task<string> ExecuteAiRequestAsync(string url, object body, bool cleanJson)
+        private async Task<string> ExecuteAiRequestAsync(string url, string jsonPayload, bool cleanJson)
         {
-            var jsonPayload = JsonSerializer.Serialize(body);
             var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
             
             var response = await _httpClient.PostAsync(url, content);
             
-            // Fängt das "TooManyRequests" ab, das deine Partnerin gepostet hat
-            if ((int)response.StatusCode == 429)
+            // Wenn etwas schiefgeht, werfen wir den EXAKTEN Fehler, damit nichts stumm abstürzt!
+            if (!response.IsSuccessStatusCode) 
             {
-                throw new HttpRequestException("TooManyRequests");
+                var errorContent = await response.Content.ReadAsStringAsync();
+                
+                if ((int)response.StatusCode == 429)
+                    throw new HttpRequestException("Google API Limit erreicht (TooManyRequests). Bitte warte eine Minute.");
+                    
+                throw new HttpRequestException($"Gemini API Fehler ({response.StatusCode}): {errorContent}");
             }
-            
-            // Falls ein anderer Fehler auftritt, leeren String zurückgeben (sicheres Fallback)
-            if (!response.IsSuccessStatusCode) return ""; 
 
             var responseString = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseString);
