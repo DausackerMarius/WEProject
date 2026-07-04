@@ -25,12 +25,13 @@ namespace WeProject.Services
             _pdfTextExtractionService = pdfTextExtractionService;
         }
 
-        // FEATURE 1: Dateinamen generieren (Intelligente Benennung)
+        // FEATURE 1: Dateinamen generieren
         public async Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile)
         {
             string documentText = await _pdfTextExtractionService.ExtractTextFromPdfAsync(pdfFile);
             
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            // KORREKTUR: Nutzung des stabilen und offiziellen 1.5 Modells
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
             
             string promptText = $@"Du bist ein präziser Assistent für die Dateiverwaltung. 
             Analysiere den folgenden Text aus einem Vorlesungs-Skript und generiere einen passenden, extrem kurzen Dateinamen (maximal 3 bis 5 Wörter, keine Umlaute, keine Sonderzeichen, nur mit Bindestrichen getrennt). 
@@ -52,7 +53,7 @@ namespace WeProject.Services
         // FEATURE 2: Multiple-Choice Fragen generieren
         public async Task<string> GenerateQuestionsFromTextAsync(string documentText, int questionCount)
         {
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
             
             string systemPrompt = $@"Du bist ein strenger Universitätsprofessor. 
             Erstelle aus dem folgenden Text exakt {questionCount} Multiple-Choice-Fragen auf akademischem Niveau. 
@@ -74,7 +75,7 @@ namespace WeProject.Services
         // FEATURE 3: Didaktischer Gutachter (Validierung der Fragen)
         public async Task<string> ValidateQuestionAsync(string questionText, List<string> answers)
         {
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
             
             string answersText = string.Join(" | ", answers);
             string promptText = $@"Prüfe die folgende Multiple-Choice-Frage:
@@ -98,7 +99,7 @@ namespace WeProject.Services
         // FEATURE 4: Kapitel-Titel generieren
         public async Task<string> GenerateTitleFromTextAsync(string documentText)
         {
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
             
             string promptText = $@"Du bist ein präziser Assistent für Universitätsprofessoren. 
             Analysiere den folgenden Text eines Vorlesungs-Skripts und generiere einen passenden, extrem kurzen Titel (maximal 3 bis 6 Wörter) für dieses Kapitel. 
@@ -122,11 +123,10 @@ namespace WeProject.Services
         private async Task<string> ExecuteAiRequestAsync(string url, string jsonPayload, bool cleanJson)
         {
             int maxRetries = 3; 
-            int delayMilliseconds = 2500; // Startet mit 2,5 Sekunden Wartezeit bei Überlastung
+            int delayMilliseconds = 2500; 
 
             for (int i = 0; i < maxRetries; i++)
             {
-                // Wichtig: StringContent muss in der Schleife neu instanziiert werden
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
                 var response = await _httpClient.PostAsync(url, content);
                 
@@ -146,15 +146,15 @@ namespace WeProject.Services
                     return text.Trim();
                 }
 
-                // Fall: API-Limit erreicht (429) oder Server kurzfristig überlastet (503)
+                // Retry bei Überlastung (429 Too Many Requests) oder Server-Fehler (503 Service Unavailable)
                 if (((int)response.StatusCode == 429 || (int)response.StatusCode == 503) && i < (maxRetries - 1))
                 {
                     await Task.Delay(delayMilliseconds);
-                    delayMilliseconds *= 2; // Exponential Backoff: Erhöht die Wartezeit (2.5s -> 5.0s)
-                    continue; // Startet den nächsten Versuch der Schleife
+                    delayMilliseconds *= 2; 
+                    continue; 
                 }
 
-                // Wenn alle Retries aufgebraucht sind oder ein schwerer anderer Fehler vorliegt:
+                // Fehler werfen, falls das Limit endgültig erreicht ist oder ein anderer Fehler vorliegt
                 var errorContent = await response.Content.ReadAsStringAsync();
                 
                 if ((int)response.StatusCode == 429)
