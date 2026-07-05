@@ -21,9 +21,12 @@
                             <label asp-for="Title" class="form-label fw-bold">Titel des Kapitels</label>
                             <div class="input-group">
                                 <input asp-for="Title" id="chapterTitleInput" class="form-control" placeholder="z. B. Einführung in ASP.NET" required />
+                                @* FIX: Temporär deaktiviert - Titel aus PDF auslesen (KI-Funktion) *@
+                                @*
                                 <button type="button" class="btn" style="background-color: #FFC107; color: #000;" id="btnSuggestTitle">
                                     ✨ Titel aus PDF auslesen
                                 </button>
+                                *@
                             </div>
                             <span asp-validation-for="Title" class="text-danger"></span>
                             <div id="titleGenerationFeedback" class="form-text mt-2"></div>
@@ -72,6 +75,8 @@
                 element.classList.add(`text-${type}`);
             }
 
+            // FIX: Temporär deaktiviert - Titel aus PDF auslesen (KI-Funktion)
+            /*
             suggestButton.addEventListener('click', async function() {
                 const fileInput = document.createElement('input');
                 fileInput.type = 'file';
@@ -114,6 +119,7 @@
                 
                 fileInput.click();
             });
+            */
 
             pdfFileInput.addEventListener('change', async function() {
                 if (!this.files.length) {

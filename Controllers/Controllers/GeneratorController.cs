@@ -234,6 +234,8 @@ namespace WeProject.Controllers
         // =====================================================
         // NEUE ACTION: Unsichtbarer Endpunkt für den KI-Titel-Button
         // =====================================================
+        // FIX: Temporär deaktiviert - Titel aus PDF auslesen (KI-Funktion)
+        /*
         [HttpPost]
         public async Task<IActionResult> SuggestTitle(IFormFile pdfFile)
         {
@@ -271,6 +273,7 @@ namespace WeProject.Controllers
                 if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath);
             }
         }
+        */
     }
 
     // Hilfsklassen

@@ -190,6 +190,7 @@ namespace WeProject.Services
         }
 
         // FEATURE 4: Kapitel-Titel generieren 
+        /* FIX: Temporär deaktiviert - Titel aus PDF generieren (KI-Funktion)
         public async Task<string> GenerateTitleFromTextAsync(string documentText)
         {
             try
@@ -224,6 +225,7 @@ namespace WeProject.Services
                 return "Neues Kapitel (Offline-Modus)";
             }
         }
+        */
 
         // =========================================================================
         // ADAPTERFASSADE: GLOBALE SCHLEUSE & DEEP-BACKOFF GEGEN RATE-LIMITS

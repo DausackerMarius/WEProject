@@ -12,8 +12,8 @@ namespace WeProject.Services
         // Die Methode zum Prüfen einer bestehenden Frage
         Task<string> ValidateQuestionAsync(string questionText, List<string> answers);
 
-        // NEU: Die Methode zum Generieren des Kapitel-Titels
-        Task<string> GenerateTitleFromTextAsync(string documentText);
+        // FIX: Temporär deaktiviert - Die Methode zum Generieren des Kapitel-Titels (KI-Funktion)
+        // Task<string> GenerateTitleFromTextAsync(string documentText);
 
         // NEU: Die Methode zum Vorschlagen eines Dateinamens
         Task<string> SuggestFileNameForPdfAsync(IFormFile pdfFile);
