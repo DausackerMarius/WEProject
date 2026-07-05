@@ -92,8 +92,7 @@ namespace WeProject.Controllers
 
                     if (uploadedPdf != null && uploadedPdf.Length > 0)
                     {
-                        // FIX: Die KI liefert den Namen OHNE .pdf. Azure braucht die Endung aber zwingend, 
-                        // damit Browser und Betriebssysteme die Datei korrekt als PDF erkennen!
+                        // FIX: Einbauen der .pdf-Endung
                         string fileNameToUse = string.IsNullOrWhiteSpace(desiredFileName) 
                             ? uploadedPdf.FileName 
                             : (desiredFileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? desiredFileName : desiredFileName + ".pdf");
@@ -140,40 +139,53 @@ namespace WeProject.Controllers
         // POST: Chapter/Edit/X
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Title,ChapterNumber,CourseId,PdfFilePath")] Chapter chapter, IFormFile? uploadedPdf, bool deleteFile)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Title,ChapterNumber,CourseId")] Chapter chapterFormData, IFormFile? uploadedPdf, bool deleteFile)
         {
-            if (id != chapter.Id)
+            if (id != chapterFormData.Id)
             {
                 return NotFound();
             }
 
             if (ModelState.IsValid)
             {
+                // 1. Original-Objekt aus der DB laden, um unbeabsichtigtes Überschreiben zu verhindern
+                var chapterToUpdate = await _context.Chapters.FindAsync(id);
+                if (chapterToUpdate == null)
+                {
+                    return NotFound();
+                }
+
+                // 2. Nur die erlaubten Felder aus dem Formular auf das DB-Objekt übertragen
+                chapterToUpdate.Title = chapterFormData.Title;
+                chapterToUpdate.ChapterNumber = chapterFormData.ChapterNumber;
+
                 try
                 {
+                    // 3. PDF-Logik separat und sicher behandeln
                     if (deleteFile)
                     {
-                        if (!string.IsNullOrEmpty(chapter.PdfFilePath))
+                        if (!string.IsNullOrEmpty(chapterToUpdate.PdfFilePath))
                         {
-                            await _storageService.DeletePdfAsync(chapter.PdfFilePath);
+                            await _storageService.DeletePdfAsync(chapterToUpdate.PdfFilePath);
                         }
-                        chapter.PdfFilePath = null;
+                        chapterToUpdate.PdfFilePath = null; // Explizit auf null setzen
                     }
                     else if (uploadedPdf != null && uploadedPdf.Length > 0)
                     {
-                        if (!string.IsNullOrEmpty(chapter.PdfFilePath))
+                        // Wenn eine neue Datei hochgeladen wird, die alte zuerst löschen
+                        if (!string.IsNullOrEmpty(chapterToUpdate.PdfFilePath))
                         {
-                            await _storageService.DeletePdfAsync(chapter.PdfFilePath);
+                            await _storageService.DeletePdfAsync(chapterToUpdate.PdfFilePath);
                         }
 
-                        // Auch beim nachträglichen Editieren lädt der Service die Datei sicher hoch
                         string? cloudUrl = await _storageService.UploadPdfAsync(uploadedPdf);
-                        chapter.PdfFilePath = cloudUrl;
+                        chapterToUpdate.PdfFilePath = cloudUrl;
                     }
+                    // WICHTIG: Wenn weder 'deleteFile' noch 'uploadedPdf' zutrifft, bleibt der alte PdfFilePath einfach erhalten.
 
-                    _context.Update(chapter);
+                    _context.Update(chapterToUpdate);
                     await _context.SaveChangesAsync();
-                    return RedirectToAction(nameof(Index), new { courseId = chapter.CourseId });
+                    return RedirectToAction(nameof(Index), new { courseId = chapterToUpdate.CourseId });
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -184,7 +196,8 @@ namespace WeProject.Controllers
                     ModelState.AddModelError("", $"Ein Fehler beim PDF-Upload ist aufgetreten: {ex.Message}");
                 }
             }
-            return View(chapter);
+            // Bei einem Fehler das Formular mit den eingegebenen Daten erneut anzeigen
+            return View(chapterFormData);
         }
 
         // POST: Chapter/Delete/X

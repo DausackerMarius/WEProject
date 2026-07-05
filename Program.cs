@@ -43,6 +43,9 @@ builder.Services.AddScoped<IPdfStorageService, PdfStorageService>();
 builder.Services.AddHttpClient<IOpenAiService, GeminiService>(client =>
 {
     client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+    // Setzen eines sehr hohen Timeouts, da der GeminiService sein eigenes, intelligenteres Timeout-Management hat.
+    // Dies verhindert den SSL-Fehler, der durch das Konflikt zwischen dem globalen Timeout und der Semaphore-Logik entsteht.
+    client.Timeout = TimeSpan.FromMinutes(5);
     
     // Liest den API-Schlüssel aus der Konfiguration (appsettings.json oder Azure App Settings)
     string? geminiApiKey = builder.Configuration["Gemini:ApiKey"]

@@ -16,7 +16,7 @@ namespace WeProject.Services
         private readonly string _apiKey;
         private readonly PdfTextExtractionService _pdfTextExtractionService;
 
-        // 100% GARANTIE GEGEN 429-FEHLER: Globale Schleuse
+        // GEGEN 429-FEHLER: Globale Schleuse
         private static readonly SemaphoreSlim _apiSemaphore = new SemaphoreSlim(1, 1);
         private static readonly Random _random = new Random();
 
@@ -94,7 +94,7 @@ namespace WeProject.Services
             }
             catch (Exception)
             {
-                // ULTIMATIVER FALLBACK: Wenn alles scheitert, stürzt die App nicht ab!
+                // FALLBACK: Wenn alles scheitert, stürzt die App nicht ab!
                 return "Skript-Upload-Fallback";
             }
         }
@@ -135,7 +135,7 @@ namespace WeProject.Services
             }
             catch (Exception)
             {
-                // ULTIMATIVER FALLBACK: Fake-JSON, damit die Benutzeroberfläche in der Präsentation funktioniert!
+                // FALLBACK: Fake-JSON, damit die Benutzeroberfläche in der Präsentation funktioniert!
                 var mockQuestions = new List<object>();
                 for (int i = 0; i < questionCount; i++)
                 {
@@ -156,25 +156,25 @@ namespace WeProject.Services
             {
                 answers ??= new List<string>(); 
                 var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
-                string answersText = string.Join(" | ", answers);
+                string answersText = string.Join("\n- ", answers);
                 
                 string cleanQuestion = SanitizeForApi(questionText);
                 string cleanAnswers = SanitizeForApi(answersText);
 
-                string promptText = $@"Bewerte diese Klausurfrage als Gutachter auf exakt zwei Kriterien:
-                1. Sprachliche Korrektheit
-                2. Eindeutigkeit (Gibt es logisch exakt eine richtige Antwort?)
+                string promptText = $@"Du hast die Aufgabe, diese Prüfungsfrage als Gutachter zu bewerten. 
+                Prüfe die Frage und die Antworten strikt auf diese zwei Kriterien: Sind die Frage und alle Antworten sprachlich korrekt und unmissverständlich formuliert? Ist die Frage eindeutig beantwortbar (d.h., gibt es logisch betrachtet exakt EINE korrekte Antwort)?
 
-                Frage: {cleanQuestion}
-                Optionen: {cleanAnswers}
+                Frage: 
+                {cleanQuestion}
+                Optionen: 
+                - {cleanAnswers}
                 
-                Schreibe dein Gutachten als EINEN EINZIGEN zusammenhängenden Fließtext-Absatz (ca. 3 Sätze). Begründe deine Entscheidung.
-                VERBOTEN: Verwende absolut keine Überschriften, keine Aufzählungen, keine Zahlen und keine Sternchen.";
+                Gib ein knappes, professionelles Gutachten ab (maximal 2 Sätze). Gehe  auf die Sprache und die Eindeutigkeit ein und begründe deine Bewertung. Beginne direkt mit dem Gutachten, ohne einleitende Floskeln.";
 
                 var requestBody = new
                 {
                     contents = new[] { new { parts = new[] { new { text = promptText } } } },
-                    generationConfig = new { maxOutputTokens = 800, temperature = 0.2 } 
+                    generationConfig = new { maxOutputTokens = 3000, temperature = 0.2 }
                 };
 
                 string jsonPayload = JsonSerializer.Serialize(requestBody);
